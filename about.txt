@@ -1,0 +1,30 @@
+Libiry gives you an overview of all your analog, digital and audiobooks. And if you want to add book summaries to your overview, you can do that too!
+It works with your own book folder structure. There's no separate database.
+
+Analog books can be either:
+- Stored in a multi-book markdown file (one file per book shelf), or
+- Stored in separate markdown files for every book
+
+You can choose your own markdown field names. 
+
+You only need one line per book in order for the tool to work.
+In it, you store either a URL to the cover or the book title.
+This means you can redo your stock taking quickly when your overview is out of date.
+Taking stock of your analog books is not a big project. It can be done in parts, for isbn codes, only to find out your book does not exist in the database.
+
+Libiry visualizes ALL of your books and zines, with or without an ISBN number.
+It uses three databases:
+Open Library
+Google Books
+Europeana
+If an ISBN was found, but not in those databases, a link to the Worldcat catalog is provided.
+If no title could be identified, the document title is shown. 
+
+And all it takes is one photo per book shelf.
+
+For a quick start:
+Take a picture of every book shelf with https://sappelen.github.io/BookSpineScanner.
+Place the resulting markdown files in your e-library.
+If you want to, put your book summaries in there as well.
+
+You now have an overview of all your books.

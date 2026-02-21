@@ -1,0 +1,9 @@
+.epub
+.mobi
+.azw
+.azw3
+.pdf
+.cbz
+.cbr
+.md
+.markdown

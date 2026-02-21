@@ -1,0 +1,25 @@
+Location:
+Background color: #6F9D9F
+Button color: #793F4E
+Button font color: black
+Search box color: white
+Tile font color: black
+Background font color: white
+Search box font color: black
+Rounded corners y/n: y
+Only selected file types y/n: y
+
+# Configurable field names (volgorde gebaseerd op Goodreads CSV export)
+Field name cover: cover
+Field name booktitle: booktitle
+Field name author: author
+Field name isbn: isbn
+Field name rating: rating
+Field name publisher: publisher
+Field name year: year
+Field name language: language
+Field name tags: tags
+Field name series: series
+Field name series_index: series_index
+Field name description: description
+Field name notes: notes
