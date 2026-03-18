@@ -107,7 +107,7 @@ class CoverCache:
         thumb_path = self.thumbs_dir / f"{path_hash}.png"
 
         if cover:
-            # Save cover directly without gray background - Kivy will stretch it
+            # Save cover with center crop to avoid distortion
             cover = cover.copy()
             # Convert to RGB if needed (remove alpha to avoid issues)
             if cover.mode == 'RGBA':
@@ -116,14 +116,56 @@ class CoverCache:
                 cover = bg
             elif cover.mode != 'RGB':
                 cover = cover.convert('RGB')
-            # Resize to thumbnail size
-            cover = cover.resize(self.THUMB_SIZE, Image.Resampling.LANCZOS)
+            # Center crop: scale to cover target size, then crop center
+            cover = self._center_crop_resize(cover, self.THUMB_SIZE)
             cover.save(thumb_path, 'PNG')
         else:
             # No cover - don't create blank, let main.py handle fallback to book.png
             self._create_blank_cover(filepath.stem, thumb_path)
 
         return thumb_path
+
+    def _center_crop_resize(self, img: Image.Image, target_size: tuple) -> Image.Image:
+        """
+        Resize image to fill target size using center crop.
+
+        The image is scaled to completely cover the target size while maintaining
+        aspect ratio, then cropped from the center to fit exactly.
+        This avoids distortion while ensuring no empty space.
+
+        Args:
+            img: Source PIL Image
+            target_size: (width, height) tuple
+
+        Returns:
+            Center-cropped and resized image
+        """
+        target_w, target_h = target_size
+        img_w, img_h = img.size
+
+        # Calculate aspect ratios
+        target_ratio = target_w / target_h
+        img_ratio = img_w / img_h
+
+        if img_ratio > target_ratio:
+            # Image is wider than target - fit height, crop width
+            new_height = target_h
+            new_width = int(target_h * img_ratio)
+        else:
+            # Image is taller than target - fit width, crop height
+            new_width = target_w
+            new_height = int(target_w / img_ratio) if img_ratio > 0 else target_w
+
+        # Resize to cover size
+        img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+        # Center crop to exact target size
+        left = (new_width - target_w) // 2
+        top = (new_height - target_h) // 2
+        right = left + target_w
+        bottom = top + target_h
+
+        return img.crop((left, top, right, bottom))
 
     def _create_blank_cover(self, title: str, save_path: Path):
         """Create a blank cover with the title text."""

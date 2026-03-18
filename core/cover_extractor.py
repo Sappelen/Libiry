@@ -35,12 +35,21 @@ class CoverExtractor:
         """
         Extract cover from ebook file.
 
+        Zoekt eerst naar een sidecar image (bijv. book.pdf.jpg) in dezelfde folder.
+        Als die niet bestaat, probeert de cover uit het bestand zelf te extraheren.
+
         Args:
             filepath: Path to the ebook file
 
         Returns:
             PIL Image or None if no cover found or extraction failed
         """
+        # Check voor sidecar cover image (bijv. book.pdf.jpg, book.epub.png)
+        # Zelfde logica als OPF sidecar files
+        sidecar_cover = self._extract_sidecar_cover(filepath)
+        if sidecar_cover:
+            return sidecar_cover
+
         suffix = filepath.suffix.lower()
 
         extractors = {
@@ -61,6 +70,36 @@ class CoverExtractor:
             except Exception as e:
                 print(f"Failed to extract cover from {filepath}: {e}")
                 return None
+        return None
+
+    def _extract_sidecar_cover(self, filepath: Path) -> Optional[Image.Image]:
+        """
+        Extract cover from sidecar image file.
+
+        Zoekt naar een image file met dezelfde naam als het boek + image extensie.
+        Bijv: book.pdf.jpg, book.epub.png, book.mobi.jpeg
+
+        Dit werkt volgens dezelfde logica als OPF sidecar files.
+
+        Args:
+            filepath: Path to the ebook file
+
+        Returns:
+            PIL Image or None if no sidecar cover found
+        """
+        # Ondersteunde image extensies
+        image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+
+        for ext in image_extensions:
+            # Sidecar format: book.pdf.jpg (extensie achter bestandsnaam)
+            sidecar_path = filepath.parent / (filepath.name + ext)
+            if sidecar_path.exists():
+                try:
+                    return Image.open(sidecar_path)
+                except Exception as e:
+                    print(f"Failed to load sidecar cover {sidecar_path}: {e}")
+                    continue
+
         return None
 
     def _extract_epub(self, filepath: Path) -> Optional[Image.Image]:

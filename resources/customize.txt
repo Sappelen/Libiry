@@ -23,3 +23,7 @@ Field name series: series
 Field name series_index: series_index
 Field name description: description
 Field name notes: notes
+
+# Configurable field names (uitsluitend voor gebruik in Libiry2Go)
+Field name file_created: created
+Field name file_modified: updated

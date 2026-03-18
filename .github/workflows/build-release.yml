@@ -1,0 +1,308 @@
+# =============================================================================
+# GitHub Actions Workflow - Build and Release Libiry
+# =============================================================================
+# Dit workflow wordt automatisch uitgevoerd wanneer:
+# 1. Een nieuwe tag wordt gepusht (v*.*.*)
+# 2. Handmatig via GitHub Actions interface (workflow_dispatch)
+#
+# Het bouwt installers voor alle drie de platforms en publiceert ze als
+# GitHub Release downloads, net zoals GIMP en andere populaire software.
+#
+# Hoe te gebruiken:
+# 1. Push een tag: git tag v1.0.0 && git push origin v1.0.0
+# 2. Of: ga naar Actions > Build Release > Run workflow
+# =============================================================================
+
+name: Build Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Triggered bij version tags zoals v1.0.0, v1.2.3
+  workflow_dispatch:  # Handmatig starten mogelijk
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+# Voorkom dat meerdere builds tegelijk lopen
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ===========================================================================
+  # Windows Build
+  # ===========================================================================
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          pip install kivy[full]
+          pip install kivy_deps.sdl2 kivy_deps.glew
+          pip install -r requirements.txt
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --clean --noconfirm libiry.spec
+
+      - name: Install Inno Setup
+        run: |
+          choco install innosetup -y
+
+      - name: Build Installer
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+
+      - name: Upload Windows Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/installer/LibirySetup.exe
+          if-no-files-found: error
+
+  # ===========================================================================
+  # macOS Build
+  # ===========================================================================
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          pip install kivy[full]
+          pip install -r requirements.txt
+
+      - name: Convert icon to icns
+        run: |
+          # Maak iconset met Python/PIL
+          python3 << 'EOF'
+          from PIL import Image
+          import os
+
+          ico_path = "resources/icons/Libiry.ico"
+          iconset_path = "resources/icons/Libiry.iconset"
+          os.makedirs(iconset_path, exist_ok=True)
+
+          img = Image.open(ico_path)
+          img = img.convert('RGBA')
+
+          # macOS vereist specifieke icon groottes
+          sizes = [(16, '16x16'), (32, '16x16@2x'), (32, '32x32'), (64, '32x32@2x'),
+                   (128, '128x128'), (256, '128x128@2x'), (256, '256x256'),
+                   (512, '256x256@2x'), (512, '512x512'), (1024, '512x512@2x')]
+
+          for size, name in sizes:
+              resized = img.resize((size, size), Image.Resampling.LANCZOS)
+              resized.save(f"{iconset_path}/icon_{name}.png")
+
+          print("Icon sizes generated")
+          EOF
+
+          # Converteer naar icns
+          iconutil -c icns "resources/icons/Libiry.iconset" -o "resources/icons/Libiry.icns"
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --clean --noconfirm libiry_macos.spec
+
+      - name: Create DMG
+        run: |
+          mkdir -p dist/installer dist/dmg_temp
+          cp -R dist/Libiry.app dist/dmg_temp/
+          ln -s /Applications dist/dmg_temp/Applications
+          hdiutil create -volname "Libiry" -srcfolder dist/dmg_temp -ov -format UDZO dist/installer/Libiry-Installer.dmg
+          rm -rf dist/dmg_temp
+
+      - name: Upload macOS Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-installer
+          path: dist/installer/Libiry-Installer.dmg
+          if-no-files-found: error
+
+  # ===========================================================================
+  # Linux Build
+  # ===========================================================================
+  build-linux:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3-pip \
+            libgl1-mesa-dev \
+            libgles2-mesa-dev \
+            libsdl2-dev \
+            libsdl2-image-dev \
+            libsdl2-mixer-dev \
+            libsdl2-ttf-dev \
+            libmtdev-dev \
+            fuse \
+            libfuse2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          pip install kivy[full]
+          pip install -r requirements.txt
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --clean --noconfirm libiry_macos.spec
+
+      - name: Download appimagetool
+        run: |
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+
+      - name: Create AppImage
+        run: |
+          mkdir -p dist/installer
+
+          # Setup AppDir structure
+          APPDIR="dist/Libiry.AppDir"
+          mkdir -p "$APPDIR/usr/bin"
+          mkdir -p "$APPDIR/usr/share/icons/hicolor/256x256/apps"
+          mkdir -p "$APPDIR/usr/share/applications"
+
+          # Copy PyInstaller output
+          cp -R dist/Libiry/* "$APPDIR/usr/bin/"
+
+          # Create desktop entry
+          cat > "$APPDIR/libiry.desktop" << 'DESKTOP'
+          [Desktop Entry]
+          Type=Application
+          Name=Libiry
+          Comment=E-book library manager
+          Exec=Libiry
+          Icon=libiry
+          Categories=Office;Viewer;
+          Terminal=false
+          DESKTOP
+
+          cp "$APPDIR/libiry.desktop" "$APPDIR/usr/share/applications/"
+
+          # Convert icon
+          python3 << 'EOF'
+          from PIL import Image
+          img = Image.open("resources/icons/Libiry.ico")
+          img = img.convert('RGBA')
+          img = img.resize((256, 256), Image.Resampling.LANCZOS)
+          img.save("dist/Libiry.AppDir/libiry.png")
+          img.save("dist/Libiry.AppDir/usr/share/icons/hicolor/256x256/apps/libiry.png")
+          EOF
+
+          # Create AppRun
+          cat > "$APPDIR/AppRun" << 'APPRUN'
+          #!/bin/bash
+          SELF=$(readlink -f "$0")
+          HERE=${SELF%/*}
+          export PATH="${HERE}/usr/bin:${PATH}"
+          export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH}"
+          exec "${HERE}/usr/bin/Libiry" "$@"
+          APPRUN
+          chmod +x "$APPDIR/AppRun"
+
+          # Build AppImage
+          ./appimagetool-x86_64.AppImage --appimage-extract-and-run "$APPDIR" dist/installer/Libiry-x86_64.AppImage
+
+      - name: Upload Linux Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-installer
+          path: dist/installer/Libiry-x86_64.AppImage
+          if-no-files-found: error
+
+  # ===========================================================================
+  # Create GitHub Release
+  # ===========================================================================
+  create-release:
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            # Extract version from tag (remove 'v' prefix)
+            echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Rename artifacts with version
+        run: |
+          mkdir -p release
+          cp artifacts/windows-installer/LibirySetup.exe "release/LibirySetup-${{ steps.version.outputs.version }}.exe"
+          cp artifacts/macos-installer/Libiry-Installer.dmg "release/Libiry-${{ steps.version.outputs.version }}-macOS.dmg"
+          cp artifacts/linux-installer/Libiry-x86_64.AppImage "release/Libiry-${{ steps.version.outputs.version }}-Linux-x86_64.AppImage"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Libiry v${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            release/LibirySetup-${{ steps.version.outputs.version }}.exe
+            release/Libiry-${{ steps.version.outputs.version }}-macOS.dmg
+            release/Libiry-${{ steps.version.outputs.version }}-Linux-x86_64.AppImage
+          body: |
+            ## Download Libiry v${{ steps.version.outputs.version }}
+
+            ### Windows
+            Download and run `LibirySetup-${{ steps.version.outputs.version }}.exe`
+
+            ### macOS
+            Download `Libiry-${{ steps.version.outputs.version }}-macOS.dmg`, open it, and drag Libiry to Applications.
+
+            ### Linux
+            Download `Libiry-${{ steps.version.outputs.version }}-Linux-x86_64.AppImage`, make it executable (`chmod +x`), and run.

@@ -9,6 +9,39 @@ TESTEDBYUSER: Voor Windows is Python 3.12 vereist (Kivy ondersteunt Python 3.14 
 TESTEDBYUSER: run.bat start de app zonder DOS popup (via pythonw)
 TESTEDBYUSER: De app blijft offline ook gewoon werken. Hij toont dan alleen wat minder book covers
 
+WINDOWS INSTALLER
+-----------------
+TOBETESTED: PyInstaller bundelt Python + dependencies in standalone executable
+TOBETESTED: Inno Setup maakt professionele installer (LibirySetup.exe)
+TOBETESTED: Installer plaatst desktop shortcut en Start Menu entry
+TOBETESTED: Eindgebruikers hoeven geen Python te installeren
+
+MACOS APP
+---------
+TOBETESTED: PyInstaller maakt .app bundle voor macOS
+TOBETESTED: build-macos.sh bouwt automatisch de .app
+TOBETESTED: Optioneel: --dmg flag maakt een DMG voor distributie
+TOBETESTED: DMG bevat .app en link naar Applications folder
+TOBETESTED: Eindgebruikers: drag to Applications, klaar
+
+LINUX APPIMAGE
+--------------
+TOBETESTED: AppImage is één bestand, geen installatie nodig
+TOBETESTED: Werkt op vrijwel elke Linux distributie
+TOBETESTED: build-appimage.sh bouwt automatisch de AppImage
+TOBETESTED: Eindgebruikers: chmod +x en dubbelklikken
+TOBETESTED: Optioneel: --install voor desktop integratie
+
+ANDROID APK
+-----------
+TOBETESTED: Buildozer maakt Android APK van de Kivy app
+TOBETESTED: Build vereist Linux (of WSL2 op Windows)
+TOBETESTED: build-android.sh automatiseert het build proces
+TOBETESTED: Eerste build duurt 15-30 min (SDK/NDK download)
+TOBETESTED: Daarna is rebuilden veel sneller
+TOBETESTED: APK installeerbaar via USB (adb) of handmatig
+TOBETESTED: create-icons.sh maakt Android icons vanuit Libiry.ico
+
 FOLDER STRUCTUUR
 ----------------
 TESTEDBYUSER: In folder Resources staan de standaardinstellingen van de app. In Customize kan men die aanpassen
@@ -29,7 +62,7 @@ TESTEDBYUSER: Font size: de puntsgrootte voor alle teksten rond het grid (knoppe
 TESTEDBYUSER: Alle popups (Settings, Information, Move, Delete, etc.) gebruiken Background color en Background font color voor de titelbalk
 TESTEDBYUSER: Rounded corners y/n: - als n of N staat, toon dan voor alle knoppen en de search box met rechte hoeken. Anders ronde hoeken
 TESTEDBYUSER: Only selected file types y/n: - als er y of Y staat, toon dan alleen de bestandstypes uit document 'selected types.txt'. Toon anders alle bestanden
-TOBETESTED: Fuzzy search y/n. Standaard staat deze op nee.
+TESTEDBYUSER: Fuzzy search y/n. Standaard staat deze op nee.
 TESTEDBYUSER: In het settings-scherm zit een variabele Show book title. Dit vinkje staat direct onder vinkje 'Scrollbar always visible'. Als wel een cover getoond kan worden: toon dan (wit op zwart) [author] - [booktitle]" bovenop de tile. De setting is een checkbox - de wijziging wordt actief na herstart.
 TOBEBUILTNICETOHAVE: The look currently in customizing (all the variables in customize.txt and all the logos) will be the default look for new users
 
@@ -38,7 +71,7 @@ CONFIGUREERBARE VELDNAMEN
 TOBETESTED: Veldvolgorde is gebaseerd op Goodreads CSV export voor maximale compatibiliteit met Goodreads, Obsidian plugins (Booksidian, Book Search Plus) en andere boekencatalogus-tools.
 
 TOBETESTED: De volgende velden zijn configureerbaar (in Goodreads volgorde):
-TOBETESTED: 1. Field name cover: bijv. "coverimage", "thumbnail" (standaard: "cover") - UI: cover afbeelding
+TESTEDBYUSER: 1. Field name cover: bijv. "coverimage", "thumbnail" (standaard: "cover") - UI: cover afbeelding
 TOBETESTED: 2. Field name booktitle: bijv. "title", "naam" (standaard: "booktitle") - Goodreads: Title
 TOBETESTED: 3. Field name author: bijv. "auteur", "writer" (standaard: "author") - Goodreads: Author
 TOBETESTED: 4. Field name isbn: bijv. "isbn_nummer", "ISBN" (standaard: "isbn") - Goodreads: ISBN
@@ -51,17 +84,26 @@ TOBETESTED: 10. Field name series: bijv. "serie", "reeks" (standaard: "series") 
 TOBETESTED: 11. Field name series_index: bijv. "deel", "volume" (standaard: "series_index") - Extra: serie volgnummer
 TOBETESTED: 12. Field name description: bijv. "omschrijving", "samenvatting" (standaard: "description") - Goodreads: My Review
 TOBETESTED: 13. Field name notes: bijv. "notities", "opmerkingen" (standaard: "notes") - Goodreads: Private Notes
+TOBETESTED: 14. Field name file_created: bijv. "created", "aangemaakt" (standaard: "file_created") - Extra: bestand aanmaakdatum
+TOBETESTED: 15. Field name file_modified: bijv. "updated", "gewijzigd" (standaard: "file_modified") - Extra: bestand wijzigingsdatum
+TOBETESTED: 16. Field name author_sort: bijv. "author_lf", "auteur_sort" (standaard: "author_sort") - Calibre: opf:file-as
+TOBETESTED: 17. Field name pages: bijv. "paginas", "page_count" (standaard: "pages") - Extra: aantal pagina's
+TOBETESTED: 18. Field name publication_date: bijv. "pub_date", "publicatiedatum" (standaard: "publication_date") - Extra: volledige publicatiedatum
+TOBETESTED: 19. Field name translator: bijv. "vertaler" (standaard: "translator") - Extra: vertaler (dc:contributor role="trl")
+TOBETESTED: 20. Field name illustrator: bijv. "illustrator" (standaard: "illustrator") - Extra: illustrator (dc:contributor role="ill")
 
 TOBETESTED: Configuratie in customize/customize.txt prevaleert boven resources/customize.txt
 TOBETESTED: Bij het parsen van markdown files: gebruik de geconfigureerde veldnamen uit customize.txt
+DELETED: Setting "Multi-book markdown y/n": Verwijderd. Multi-book detectie is nu automatisch via de persistente file_cache. De cache slaat metadata per boek op, waardoor herhaalde loads instant zijn en er geen setting meer nodig is.
 DELETED: Als een geconfigureerde veldnaam niet gevonden wordt, probeer dan ook de standaard veldnaam als fallback. Nee, dat mag niet, hard coded veldnamen afvragen kan gekke dingen opleveren in combinatie met hoe mensen hun obsidian files gebruiken. Het is niet te voorzien welke situaties zich daarbij voordoen
-TOBETESTED: Als men een foldernaam heeft ingegeven in customize/customize.txt, gebruik die dan. Anders, as men een foldernaam heeft ingegeven in resources/customize.txt, gebruik die. Anders, gebruik de meest recent gebruikte folder. Anders, gebruik de folder waar je je in bevindt. Als, na het volgen van deze logica, je een folder wilt tonen die niet (meer) bestaat, toon dan de folder waar je je in bevindt. 
+TOBETESTED: Als men een foldernaam heeft ingegeven in customize/customize.txt, gebruik die dan. Anders, als er een foldernaam staat in resources/customize.txt, gebruik die. Anders, gebruik de meest recent gebruikte folder. Anders, gebruik de folder waar je je in bevindt. Als, na het volgen van deze logica, je een folder wilt tonen die niet (meer) bestaat, toon dan de folder waar je je in bevindt. 
 
 YAML FRONTMATTER ONDERSTEUNING
 ------------------------------
 TESTEDBYUSER: Detecteer YAML frontmatter (tekst tussen --- en ---) aan het begin van markdown files
-TOBETESTED: AANGEPASTE LOGICA: Als YAML frontmatter aanwezig is, zoek eerst in de frontmatter naar [cover]/[booktitle]. Als die NIET gevonden worden in de frontmatter, doorzoek dan OOK de rest van het bestand (voor BookSpineScanner multi-book format waar frontmatter alleen scan-metadata bevat).
-TESTEDBYUSER: Als GEEN YAML frontmatter aanwezig is, doorzoek dan wel het hele bestand naar platte key: value regels (huidige gedrag voor multi-book files)
+TOBETESTED: Als geen YAML frontmatter aanwezig is, schrijf die dan zelf weg aan het begin van het bestand bij opslaan van metadata.
+DELETED: AANGEPASTE LOGICA voor zoeken in rest van bestand - alleen YAML frontmatter wordt nu geparsed
+DELETED: Zoeken naar platte key: value regels in hele bestand - alleen YAML frontmatter wordt nu geparsed
 TESTEDBYUSER: Parse YAML frontmatter met dezelfde veldnamen als platte key: value regels
 TESTEDBYUSER: Negeer onbekende velden in YAML frontmatter (forward compatibility)
 TOBETESTED: Voor Obsidian-compatibiliteit: ondersteun cover syntax met quotes en [[brackets]] en ook met embedding ![[exclamationmarkplusbrackets]], bijv. cover: "[[url]]"
@@ -71,43 +113,49 @@ VARIABELEN BESTANDSTYPE, DOCUMENTTYPE, COVER, BOOKTITLE, AUTHOR en ISBN
 TESTEDBYUSER: Vul bestandstype met de extensie van je bestand (.epub, .pdf et cetera)
 TESTEDBYUSER: Vul documenttype voor markdown bestanden: 1) met type: uit de YAML frontmatter, als die er is. Voor markdown bestanden zonder YAML frontmatter, vul hem met de eerste occurrence van type: in de tekst. Voor alle andere bestanden blijft deze variabele leeg
 TESTEDBYUSER: Vul voor ebooks de variabele booktitle met de boektitel
-TOBETESTED: Vul voor ebooks de variabele author met de author
-TOBETESTED: Voor markdown files met YAML frontmatter: booktitle is de tekst achter "[booktitle]:". Als die regel er niet in staat, gebruik dan de tekst achter "[cover]:".
-TOBETESTED: Voor book covers uit markdown files zonder YAML frontmatter (mogelijk staan er meerdere boeken in 1 bestand): als er na een regel met "[cover]:" en voor de volgende regel met "[cover]:" een regel staat met "[booktitle]:", gebruik die waarde dan voor booktitle. Dus bij: [cover], [cover], [booktitle]: alleen bij de tweede cover hoort een booktitle, de eerste heeft er geen. Als er geen aparte "[booktitle]:"-regel is gevonden, vul booktitle dan met de tekst achter "[cover]:".
-TOBETESTED: Vul voor ebooks de variabele [isbn] met het isbn-nummer.
-TOBETESTED: Vul voor markdown-bestanden variabele [isbn] vanuit de corresponderende regel in het markdownbestand. De logica is hetzelfde als voor [booktitle]. Dus: [cover], [cover], [booktitle], [isbn], [cover]: alleen voor het tweede boek is een isbn beschikbaar.
-TOBETESTED: Vul voor markdown files de variabele author met de waarde uit regel "[author]:". De logica is hetzelfde als voor booktitle.
+TESTEDBYUSER: Vul voor ebooks de variabele author met de author
+TOBEBUILTNICETOHAVE: Gebruik voor mp3's de variabele booktitle met de naam van de track (zowel bij schrijven als bij lezen)
+TOBEBUILTNICETOHAVE: Gebruik voor mp3's de variabele author met de naam van de artiest (zowel bij schrijven als bij lezen)
+TESTEDBYUSER: Voor markdown files met YAML frontmatter: booktitle is de tekst achter "[booktitle]:". Als die regel er niet in staat, gebruik dan de tekst achter "[cover]:".
+TESTEDBYUSER: Voor book covers uit markdown files zonder YAML frontmatter (mogelijk staan er meerdere boeken in 1 bestand): als er na een regel met "[cover]:" en voor de volgende regel met "[cover]:" een regel staat met "[booktitle]:", gebruik die waarde dan voor booktitle. Dus bij: [cover], [cover], [booktitle]: alleen bij de tweede cover hoort een booktitle, de eerste heeft er geen. Als er geen aparte "[booktitle]:"-regel is gevonden, vul booktitle dan met de tekst achter "[cover]:".
+TESTEDBYUSER: Als er naast het boek een image staat met dezelfde naam + image extensie (bijv: book.pdf → book.pdf.jpg of book.epub.png), dan heeft dat image prioriteit boven de embedded cover. Ondersteunde formaten: .jpg, .jpeg, .png, .gif, .webp
+TESTEDBYUSER: Vul voor ebooks de variabele [isbn] met het isbn-nummer.
+TESTEDBYUSER: Vul voor markdown-bestanden variabele [isbn] vanuit de corresponderende regel in het markdownbestand. De logica is hetzelfde als voor [booktitle]. Dus: [cover], [cover], [booktitle], [isbn], [cover]: alleen voor het tweede boek is een isbn beschikbaar.
+TESTEDBYUSER: Vul voor markdown files de variabele author met de waarde uit regel "[author]:". De logica is hetzelfde als voor booktitle.
 
 ICONEN EN VISUELE ELEMENTEN
 ---------------------------
 TESTEDBYUSER: Libiry.ico uit folder resources wordt getoond in de Windows menubalk en als logo links bovenin de grijze Window frame
-DELETED: Voor back, forward, refresh, - en + zijn er knoppen met transparante achtergrond. Ze heten resp. back.png, forward.png, refresh.png, plus.png en minus.png en staan in folder customize. Als ze er niet staan, gebruik dan resources/icons
-TOBETESTED: Voor back, refresh en + zijn er knoppen met transparante achtergrond. Ze heten resp. back.png, refresh.png en plus.png en staan in folder customize. Als ze er niet staan, gebruik dan resources/icons
-TOBETESTED: Met de plus-knop ga je naar https://sappelen.github.io/BookSpineScanner/
+TESTEDBYUSER: Voor back, refresh en + zijn er knoppen met transparante achtergrond. Ze heten resp. back.png, refresh.png en plus.png en staan in folder customize. Als ze er niet staan, gebruik dan resources/icons
+TOBETESTED: Met de plus-knop ga je naar een popup met daarop 3 knoppen. de eerste knop gaat naar https://sappelen.github.io/BookSpineScanner/. De tweede naar Calibre2Libiry, en de derde naar Libiry2Go. Op Windows worden .bat files gestart, op Mac/Linux .py files.
+DELETED: Met de plus-knop ga je naar een popup met alleen BookSpineScanner link - vervangen door uitgebreidere popup met 3 knoppen
 TESTEDBYUSER: Met de back-knop ga je naar de bovenliggende directory. Als die er niet is wordt de knop niet getoond, maar de rest van de knoppen verschuift ook niet. Er blijft simpelweg een lege plek op de plek van de knop
 TESTEDBYUSER: de tiles worden getoond zonder bezel of onzichtbare margin eromheen
 TESTEDBYUSER: voor de folder tiles, toon folder.png uit folder customize. Als die er niet staat, gebruik dan resources/folder.png
 TESTEDBYUSER: De fontgrootte van de boektekst is net zo groot als die van de foldertekst.
 TESTEDBYUSER: Alle fonts zijn regular (dus niet bold).
 TESTEDBYUSER: Voor ebooks wordt, waar mogelijk, de cover uit het ebook getoond.
+TESTEDBYUSER: Sidecar cover images: als er een image file bestaat met dezelfde naam als het boek + image extensie (bijv. book.pdf.jpg, book.epub.png), wordt die als cover getoond. Dit heeft prioriteit boven de embedded cover. Ondersteunde formaten: .jpg, .jpeg, .png, .gif, .webp
 TESTEDBYUSER: Voor book covers uit markdown files met YAML frontmatter: probeer een cover te tonen mbv de syntax "cover: [[url van cover]]". Probeer ook "cover: ![[url van cover]]" en "cover: url van cover". Stretch de covers nog wel even naar dezelfde breedte/hoogte als de andere images
 TESTEDBYUSER: Voor book covers uit markdown files zonder YAML frontmatter: Staan er meerdere boeken in, toon dan meerdere boek tiles in het grid.
 TESTEDBYUSER: LIMIET: Maximaal 100 boeken per markdown file. Bij meer boeken worden alleen de eerste 100 verwerkt (met warning in console). Dit voorkomt performance problemen bij twins filter (O(n²) matching). BookSpineScanner splitst automatisch bij >100 boeken.
 TESTEDBYUSER: Als geen cover getoond kan worden (bv je bent offline): toon book.png uit folder customize. Als die er niet staat: gebruik resources/book.png.
 TESTEDBYUSER: Als geen cover getoond kan worden: Toon "[author] - [booktitle]" bovenop de tile. Probeer zoveel mogelijk van de tekst te tonen, zonder over de rand van de tile te gaan.
 DELETED: Als wel een cover getoond kan worden: toon "[booktitle]" en op een nieuwe regel "[author]" als tooltip bij hover. (Verwijderd: Kivy tooltip werkte niet correct met ScrollView)
+TESTEDBYUSER: Het aantal folders en files wordt getoond in de statusbalk.
+TESTEDBYUSER: Normaal gesproken staat er in de statusbalk: x folders. Als x=1, wordt de tekst: x folder. Normaal gesproken staat er: y files. Als y=1, wordt de tekst: y file.
 TESTEDBYUSER: De informatie van een bestand (extensie, file size, foldernaam) wordt standaard getoond in de statusbalk als er precies 1 file geselecteerd is.
 TESTEDBYUSER: Toon voor folders de foldernaam bovenop de tile
 TESTEDBYUSER: Alle schermelementen zijn netjes uitgelijnd, waarbij de afstand tussen de linker kantlijn en het cover grid leidend is. Noem die afstand X. De tekst links onderin heeft ook een afstand X tot de linker kantlijn. De afstand tussen de bovenste kantlijn en de bovenkant van de search box is ook precies X groot. De afstand tussen de browse-button en de rechter kantlijn is ook X.
 TESTEDBYUSER: De afstand tussen de browse-button en de scrollbar is X.
 TESTEDBYUSER: De search box is in hoogte gelijk aan de Choose folder-button.
-TESTEDBYUSER: information.png wordt op de bovenste rij getoond. Bij dubbelklikken, toon de inhoud van about.txt. Gebruik voor dit popupje Background color en Background font color
+TOBETESTED: information.png wordt op de bovenste rij getoond. Bij klikken op deze knop, ga naar https://libiry.org/
 TESTEDBYUSER: gear.png wordt op de bovenste rij getoond, direct links van information.png. Bij dubbelklikken, toon een menu waarmee de inhoud van customize.txt en selected types.txt onderhouden kan worden (vergelijkbaar met de gear-functie in de bookspinescanner)
+TESTEDBYUSER: support.png wordt op de bovenste rij getoond, direct rechts van gear.png. Bij klikken op deze knop, ga naar https://sappelen.com/en/support-2/
 TESTEDBYUSER: Als er wat te scrollen valt, wordt er rechts altijd een scrollbalk getoond, in de Button color.
 DELETED: Als documenttype summary is, toon dan uiterst rechts helemaal onderin de book tile een rood driehoekje
-TOBETESTED: Als één van de tags summary is, toon dan uiterst rechts helemaal onderin de book tile een rood driehoekje (nu correct aangeroepen na metadata load)
-DELETED: Als documenttype analog is, toon dan uiterst rechts helemaal onderin de book tile een grijs driehoekje
-TOBETESTED: Als één van de tags analog is, toon dan uiterst rechts helemaal onderin de book tile een grijs driehoekje (summary heeft voorrang boven analog, nu correct aangeroepen na metadata load)
+TESTEDBYUSER: Als één van de tags summary is, toon dan uiterst rechts helemaal onderin de book tile een rood driehoekje (nu correct aangeroepen na metadata load)
+TESTEDBYUSER: Als één van de tags analog is, toon dan uiterst rechts helemaal onderin de book tile een grijs driehoekje (summary heeft voorrang boven analog, nu correct aangeroepen na metadata load)
 
 SEARCH BOX
 ----------
@@ -122,6 +170,7 @@ NAVIGATIE EN KEYBOARD SHORTCUTS
 -------------------------------
 TESTEDBYUSER: Ctrl+= of Ctrl++ voor inzoomen
 TESTEDBYUSER: Ctrl+- voor uitzoomen
+TESTEDBYUSER: Ctrl+A voor selecteer alle zichtbare boeken in het grid (geen folders, geen boeken in subdirectories)
 TESTEDBYUSER: F5 voor refresh
 TESTEDBYUSER: Alt+Left voor naar bovenliggende map
 TESTEDBYUSER: Alt+Up voor naar bovenliggende map
@@ -143,18 +192,22 @@ TESTEDBYUSER: - Delete: blijf in het search-overzicht, en verwijder alleen de wi
 TESTEDBYUSER: - Move: blijf in het search-overzicht, en verwijder alleen widgets uit het grid
 TESTEDBYUSER: - Refresh (F5): voer search opnieuw uit (reset niet naar normale folder view)
 TESTEDBYUSER: - Zoom (Ctrl+/-): behoud search-overzicht (zoekactie hoeft niet opnieuw maar is OK)
+TESTEDBYUSER: Als je in het zoekvenster één van de file types uit selectedtypes.txt intypt, worden alle files van dat type getoond.
 
 DOUBLES
 ------
 TESTEDBYUSER: De knop twins.png staat uiterst rechts op de bovenste regel (rechts naast information.png)
 TESTEDBYUSER: Met de knop twins.png filter je op boeken waarvan isbn meer dan 1x voorkomt, of waarvan titel en auteur (nagenoeg) aan elkaar gelijk zijn. De knop is een toggle - klik nogmaals om de filter uit te zetten. Folders worden niet getoond in deze overview, alleen files. De logica lijkt op die in de Duplicates plugin van Calibre. De filter doorzoekt recursief alle subfolders (tot max 10 diep) en toont alle duplicates over alle subfolders heen:
-TOBETESTED: - ISBN matching: boeken met identieke ISBN
-TOBETESTED: - Title+Author matching met normalisatie: verwijder prefixes (A, An, The, De, Het, Een), verwijder punctuatie, verwijder author suffixes (Jr, Sr, PhD etc), sorteer author name parts
-TESTEDBYUSER: Op de onderste regel van het scherm, direct rechts naast de statustekst, staat knop  "Move Selected". Direct rechts daarvan staat knop "Delete selected".
+TESTEDBYUSER: - ISBN matching: boeken met identieke ISBN
+TESTEDBYUSER: - Title+Author matching met normalisatie: verwijder prefixes (A, An, The, De, Het, Een), verwijder punctuatie, verwijder author suffixes (Jr, Sr, PhD etc), sorteer author name parts
+TESTEDBYUSER: Op de onderste regel van het scherm, direct rechts naast de statustekst, staat knop  "Move". Direct rechts daarvan staat knop "Delete".
 TESTEDBYUSER: Selectie-weergave: bij selectie van een tile wordt het hele blokje uitgegrijsd, en onderaan staat in geval precies één boek is geselecteerd de extensie (.epub, .mobi) met daarachter de file size en de foldernaam.
 TESTEDBYUSER: Selectie-telling: op de onderste regel tonen hoeveel items geselecteerd zijn, bijv. "7 folders (1 selected), 5 files (5 selected)"
-TESTEDBYUSER: Delete waarschuwing: bij verwijderen van een multi-book markdown file, toon "Beware! This action will delete multiple books!" ipv "This cannot be undone!"
+DELETED: Delete waarschuwing voor multi-book markdown files - multi-book support is verwijderd
 TESTEDBYUSER: Delete waarschuwing: bij verwijderen van een folder waar nog bestanden in staan (of ze nu wel of niet getoond worden in de tool, dat maakt niet uit), toon "Beware! This action will delete the files in this folder too!". Pas de tekst aan naar "Beware! This action will delete the files in these folders too!" als er meer dan 1 folder bij de geselecteerde tiles zit
+TESTEDBYUSER: Na Move/Delete cancel worden alle geselecteerde items gedeselecteerd (consistent met Edit gedrag)
+TESTEDBYUSER: Move en Delete verplaatsen/verwijderen ook bijbehorende sidecar files (metadata .opf en cover images .jpg/.png/etc.) samen met het boek
+TESTEDBYUSER: Move naar een folder waar sommige bestanden al staan: overslaan zonder error, alleen verplaatsen wat er nog niet staat. Statusbalk toont "(X already there)". Geen error popup voor overgeslagen bestanden.
 
 HIDDEN FILES EN FOLDERS
 -----------------------
@@ -164,18 +217,31 @@ TESTEDBYUSER: Windows: bestanden/folders met hidden attribuut worden ook verborg
 
 ROBUSTNESS
 -----------
-TESTEDBYUSER: Als je een folder/boek voor je hebt staan in Libiry en je verwijdert die folder/boek uit je systeem en drukt dan op refresh in Libiry, dan mag Libiry er niet uit klappen. Ook mag hij niet eindeloos blijven proberen toch te lezen
+TESTEDBYUSER: Als je een folder/boek voor je hebt staan in Libiry en je verwijdert die folder/boek uit je systeem en drukt dan op refresh in Libiry, dan mag Libiry er niet uit klappen. Ook mag hij niet eindeloos blijven proberen toch te lezen.
 
 PERFORMANCE
 -----------
 TESTEDBYUSER: De app reageert snel op de gebruiker. Nagenoeg nooit komt er een "Libiry not responding"-boodschap.
+TESTEDBYUSER: Dubbelklik op folder stopt direct het laden van de huidige folder en start met laden van de nieuwe folder
+TESTEDBYUSER: EPUB tag editing geoptimaliseerd: afbeeldingen worden niet opnieuw gecomprimeerd (ZIP_STORED), tekstbestanden gebruiken snelle compressie (level 1)
+TESTEDBYUSER: Search en tag filter tonen meteen de voortgang met een tijdsindicatie: "Filtering... 45% (12 found) - ~30 sec remaining"
+TOBETESTED: Tag filter gebruikt async batch processing zodat UI responsief blijft tijdens filteren
+TESTEDBYUSER: Save (Edit popup) toont meteen de voortgang met een tijdsindicatie: "Saving... 5/20 - ~15 sec remaining"
+TESTEDBYUSER: Met Save (Edit popup) muteer je booktitle, author, isbn, tags, rating, publisher, year, language, series, series_index, description, notes, author_sort, publication_date, pages, translator, illustrator. Cover is uitgesloten (te complex).
+
+
+METADATA BEWERKEN
+-----------------
+TOBEBUILTNICETOHAVE: Metadata editor popup voor het bekijken en aanpassen van EPUB en markdown metadata (leesstatus, rating, genre en eventueel ook title, author, ISBN, etc.). Voor markdown: YAML frontmatter aanpassen. Voor EPUB: OPF bestand in ZIP wijzigen. Inclusief backup maken voor wijziging.
+
+TESTEDBYUSER: De tag-weergave in de Edit popup is multiline (één tag per regel), net als het selected file types-vak in de settings popup. Ondersteunt meerdere tags tegelijk toevoegen of verwijderen.
 
 CACHE
 -----
 TESTEDBYUSER: Thumbnail cache in ~/.libiry/cache
 TESTEDBYUSER: Settings opslaan in ~/.libiry/settings.json
 TESTEDBYUSER: Bij opstarten van de app wordt de thumbnail cache automatisch geleegd zodat covers altijd vers worden geëxtraheerd
-TOBETESTED: Als de app problemen heeft met opstarten, leeg dan de hele cache en start meteen opnieuw op
+TESTEDBYUSER: Als de app problemen heeft met opstarten, leeg dan de hele cache en start meteen opnieuw op
 
 TOEGANKELIJKHEID (BEKENDE BEPERKING)
 ------------------------------------
@@ -183,39 +249,84 @@ TESTEDBYUSER: Kivy tekent zijn eigen UI (OpenGL-based) en gebruikt geen native O
 TESTEDBYUSER: Wel aanwezig: keyboard shortcuts (Ctrl+/-, F5, Alt+Left/Up), zoomfunctie, aanpasbare kleuren via customize.txt
 TESTEDBYUSER: Voor een volledig toegankelijke app voor blinden/slechtzienden zou een ander framework nodig zijn (bijv. Qt met QAccessible, of een webapplicatie)
 
-METADATA BEWERKEN
------------------
-TOBEBUILTNICETOHAVE: Metadata editor popup voor het bekijken en aanpassen van EPUB en markdown metadata (leesstatus, rating, genre en eventueel ook title, author, ISBN, etc.). Voor markdown: YAML frontmatter aanpassen. Voor EPUB: OPF bestand in ZIP wijzigen. Inclusief backup maken voor wijziging.
 
 TAGS ONDERHOUDEN
 ----------------
 Tags zijn labels/categorieën die aan boeken gekoppeld kunnen worden, vergelijkbaar met Calibre's tags systeem. Tags kunnen gebruikt worden voor genres, leesstatus, collecties, etc.
 
 === FASE 1: Tags lezen ===
-TOBETESTED: Tags uit markdown YAML frontmatter lezen - formaat: "tags: [fiction, sci-fi]" of "tags:\n  - fiction\n  - sci-fi"
-TOBETESTED: Tags uit markdown inline lezen (multi-book format) - formaat: "[tags]: fiction, sci-fi" (configureerbare veldnaam)
-TOBETESTED: Tags uit EPUB metadata lezen - uit dc:subject elementen in OPF (was al geïmplementeerd)
-TOBEBUILTNICETOHAVE: Tags uit MOBI/AZW metadata lezen - uit EXTH records (subject tags)
-TOBETESTED: Tags uit PDF metadata lezen - uit Keywords veld (was al geïmplementeerd)
-TOBETESTED: Tags opslaan in BookItem datastructuur als list[str] (was al geïmplementeerd)
-TOBETESTED: Tags normaliseren: lowercase, trimmen, lege tags verwijderen
+TESTEDBYUSER: Tags uit markdown YAML frontmatter lezen - formaat: "tags: [fiction, sci-fi]" of "tags:\n  - fiction\n  - sci-fi"
+TESTEDBYUSER: Tags uit markdown inline lezen (multi-book format) - formaat: "[tags]: fiction, sci-fi" (configureerbare veldnaam)
+TESTEDBYUSER: Tags uit EPUB metadata lezen - uit dc:subject elementen in OPF (was al geïmplementeerd)
+TESTEDBYUSER: Tags uit MOBI/AZW/AZW3 lezen - via OPF sidecar file (zelfde naam, .opf extensie)
+TESTEDBYUSER: Tags uit CBR lezen - via OPF sidecar file (RAR is niet leesbaar voor tags)
+TESTEDBYUSER: Tags uit PDF lezen - uit keywords veld, of uit OPF sidecar als die bestaat (voor problematische PDFs)
+TESTEDBYUSER: Tags opslaan in BookItem datastructuur als list[str]
+TESTEDBYUSER: Tags normaliseren: trimmen, lege tags verwijderen, case behouden
 
 === FASE 2: Tags tonen ===
-TOBETESTED: Special tag indicators op tiles: "summary" = rood driehoekje, "analog" = grijs driehoekje (was al geïmplementeerd)
-TOBETESTED: Tags tonen in statusbalk bij selectie van 1 boek - formaat: #tag1, #tag2 achter foldernaam
+TESTEDBYUSER: Special tag indicators op tiles: "summary" = rood driehoekje, "analog" = grijs driehoekje (was al geïmplementeerd)
+TESTEDBYUSER: Tags tonen in statusbalk bij selectie van 1 boek - formaat: #tag1, #tag2 achter foldernaam
+DELETED: Multi-book markdown files statusbalk - multi-book support is verwijderd
 
-=== FASE 3: Tags bewerken (TOBEBUILTNICETOHAVE) ===
-TOBEBUILTNICETOHAVE: Tags editor popup - toevoegen/verwijderen van tags voor geselecteerd boek
-TOBEBUILTNICETOHAVE: Voor markdown: YAML frontmatter bijwerken met nieuwe tags
-TOBEBUILTNICETOHAVE: Voor EPUB: dc:subject elementen in OPF bijwerken (backup maken)
-TOBEBUILTNICETOHAVE: Bulk tag editing - tags toevoegen aan meerdere geselecteerde boeken tegelijk
+=== FASE 3: Tags bewerken ===
+TESTEDBYUSER: Als Show tags setting uit staat, wordt de Edit Tags knop niet getoond (alle tag-afhandeling uitgeschakeld)
+TESTEDBYUSER: Tags editor popup - "Edit" knop rechtsonder naast "Move"
+TESTEDBYUSER: Tags editor popup toont "Tags" voor 1 item, "Common tags" voor meerdere items
+
+=== YAML Frontmatter Tag Handling (markdown files) ===
+TESTEDBYUSER: Bij LEZEN worden beide YAML tag formaten herkend: inline [tag1, tag2] en block style (- tag per regel)
+TESTEDBYUSER: Bij SCHRIJVEN wordt het originele formaat behouden (inline blijft inline, block blijft block)
+TESTEDBYUSER: Block style: verwijder alle "- tag" regels direct onder "tags:", schrijf nieuwe "- tag" regels met zelfde indentatie
+TESTEDBYUSER: Inline style: vervang de hele "tags: [...]" regel inclusief inhoud
+TESTEDBYUSER: Indentatie en spatiëring van het origineel worden zoveel mogelijk behouden
+
+TESTEDBYUSER: Bulk tag editing voor markdown - ondersteunt alle 3 formaten: YAML array [tag1, tag2], YAML block list (- tag), komma-gescheiden. Bracket notatie [tags]: wordt ook ondersteund.
+TESTEDBYUSER: Bulk tag toevoegen voor markdown - nieuwe tag aan alle geselecteerde boeken toevoegen
+TESTEDBYUSER: Markdown zonder cover: veld - bij tag toevoegen wordt YAML frontmatter toegevoegd met cover (bestandsnaam) en tags
+TESTEDBYUSER: Voor EPUB: dc:subject elementen in OPF bijwerken (schrijft eerst naar temp file, dan move)
+TESTEDBYUSER: Voor EPUB zonder bestaande tags: dc:subject correct toevoegen (Windows file locking fix met retry mechanisme)
+TESTEDBYUSER: Voor EPUB extra velden: author_sort als opf:file-as, publication_date in dc:date, pages als meta, translator/illustrator als dc:contributor met role
+TESTEDBYUSER: Voor MOBI/AZW/AZW3: author, publisher, language worden nu uit OPF sidecar gelezen (user edits overschrijven ebookmeta waarden)
+TESTEDBYUSER: Voor CBZ: author (Writer), publisher, series, series_index (Number) worden correct opgeslagen in ComicInfo.xml en teruggelezen
+TESTEDBYUSER: Voor PDF: keywords metadata veld bijwerken via PyMuPDF, of naar OPF sidecar als die bestaat
+TESTEDBYUSER: Voor MOBI/AZW/AZW3: tags opslaan in OPF sidecar file (zelfde naam, .opf extensie)
+TESTEDBYUSER: Voor CBZ: ComicInfo.xml Tags element bijwerken (schrijft eerst naar temp file, dan move)
+TESTEDBYUSER: Voor CBR: tags opslaan in OPF sidecar file (RAR is niet schrijfbaar)
+TESTEDBYUSER: Na Edit Tags save/cancel worden alle geselecteerde items gedeselecteerd
+DELETED: Multi-book markdown files batch wijziging - multi-book support is verwijderd
 TOBEBUILTNICETOHAVE: Tag autocomplete - suggesties op basis van bestaande tags in bibliotheek
 
-=== FASE 4: Tags filteren (TOBEBUILTNICETOHAVE) ===
+=== OPF Sidecar Files ===
+TESTEDBYUSER: OPF sidecar files worden gebruikt voor formaten waar tags niet direct opgeslagen kunnen worden
+TESTEDBYUSER: OPF file heeft zelfde naam als ebook maar met .opf extensie (bijv. book.mobi -> book.mobi.opf)
+TESTEDBYUSER: OPF formaat is compatibel met Calibre (dc:subject elementen)
+TESTEDBYUSER: check_pdf_tags.py script test welke PDFs tags kunnen lezen/schrijven en maakt OPF sidecar voor problematische PDFs
+TESTEDBYUSER: Voor alle onbekende bestandsformaten (bijv. .rtf, .mp3, .txt): gebruik automatisch OPF sidecar file voor tags
+TESTEDBYUSER: OPF files zelf (.opf) worden niet getoond in het grid en krijgen geen eigen sidecar
+
+=== PDF Metadata ===
+TESTEDBYUSER: PDF native metadata (titel, auteur, beschrijving, tags) heeft prioriteit bij lezen en schrijven
+TESTEDBYUSER: PDF native velden: title, author, subject (description), keywords (tags) - worden direct in PDF opgeslagen
+TESTEDBYUSER: PDF extra velden via OPF sidecar: isbn, language, series, series_index, rating, notes, publisher, author_sort, publication_date, pages, translator, illustrator
+TESTEDBYUSER: OPF sidecar wordt alleen aangemaakt als er extra velden zijn die PDF niet ondersteunt
+TESTEDBYUSER: Voor problematische PDFs waar native save faalt: alle native velden (booktitle, author, description, tags) worden ook naar OPF sidecar geschreven
+TESTEDBYUSER: Bij lezen: booktitle, author, description, tags uit OPF als fallback wanneer PDF die velden niet heeft
+TESTEDBYUSER: Geen duplicatie: velden die in PDF staan worden niet ook in OPF opgeslagen
+TESTEDBYUSER: Als geen extra velden meer nodig zijn wordt bestaande OPF sidecar verwijderd
+
+=== FASE 4: Tags filteren ===
 TOBEBUILTNICETOHAVE: Filter op één of meerdere tags (AND/OR)
 TOBEBUILTNICETOHAVE: Combineren met search en twins filter
-TESTEDBYUSER: Tag lijst, aflopend gesorteerd op tag count. Toon deze tag lijst onderaan het scherm, net boven de status info line
-TOBETESTED: Bij dubbelklikken op een tag uit de tag lijst filter je op alle boeken met die tag. Net als bij zoekscherm en twin scherm zie je in je scherm nu alleen nog de boeken die aan je filter voldoen, en geen folders meer
+TESTEDBYUSER: Tag lijst wordt incrementeel opgebouwd tijdens het scannen, alfabetisch gesorteerd. De taglijst begint met 'All books'. Tijdens scannen wordt "Scanning..." getoond achteraan. Toon deze tag lijst onderaan het scherm, net boven de status info line.
+TESTEDBYUSER: 'No tag' staat direct na 'All books' en wordt alleen getoond als er boeken zonder tags bij zijn - filtert op boeken zonder tags
+TESTEDBYUSER: Bij klik op een tag terwijl de tag scan nog bezig is: scan stopt direct en de geselecteerde tag filter wordt meteen toegepast
+TESTEDBYUSER: Als het opbouwen van de tag lijst langer duurt dan 10 seconden, wordt "..." als laatste tag getoond. Als je daarop drukt, krijg je hetzelfde te zien als wanneer je op 'all books' drukt.
+TESTEDBYUSER: Als er meer dan 99 tags worden getoond, stop dan met verder opbouwen van de tag lijst. Toon "..." als laatste tag. Als je daarop drukt, krijg je hetzelfde te zien als wanneer je op 'all books' drukt.
+
+TESTEDBYUSER: Bij dubbelklikken op een tag uit de tag lijst filter je op alle boeken met die tag. Net als bij zoekscherm en twin scherm zie je in je scherm nu alleen nog de boeken die aan je filter voldoen, en geen folders meer.
+TESTEDBYUSER: Tag filter stopt onmiddellijk bij user interactie (boek selecteren, knop indrukken) - UI reageert direct
+TESTEDBYUSER: Na tag wijziging met actieve filter: incrementele update (alleen gewijzigde items checken) ipv hele filter opnieuw draaien 
 
 LIBIRY2GO (COMPANION TOOL)
 --------------------------
@@ -226,5 +337,21 @@ TESTEDBYUSER: Recursief scannen van subfolders
 TESTEDBYUSER: Metadata extractie uit EPUB, MOBI, AZW, AZW3, PDF, CBR, CBZ en markdown bestanden
 TESTEDBYUSER: Alle andere bestandstypes worden ook meegenomen met basis info (filename, size, type)
 TOBETESTED: Leest veldnamen uit Libiry's customize/customize.txt zodat veldnamen consistent zijn
+TOBETESTED: Exporteert extra velden: file_created, file_modified, author_sort, publication_date, pages, translator, illustrator
+TOBETESTED: Splitst multi-book markdown files (BookSpineScanner output) als "1 book per file" is ingesteld
+TOBETESTED: Detecteert duplicate boeken (zelfde titel+auteur) en voegt (1), (2) toe aan bestandsnamen
 TESTEDBYUSER: CLI support: python libiry2go.py [input] [output] [books_per_file]
 TESTEDBYUSER: Output bestanden zijn compatibel met Libiry, Obsidian en andere markdown tools
+
+CALIBRE2LIBIRY (COMPANION TOOL)
+-------------------------------
+TESTEDBYUSER: Calibre2Libiry hernoemt Calibre metadata.opf bestanden naar Libiry formaat
+TESTEDBYUSER: Calibre slaat metadata op als metadata.opf, Libiry als {boekbestand}.opf
+TESTEDBYUSER: Zoekt recursief alle metadata.opf bestanden in een Calibre library
+TESTEDBYUSER: Vindt het bijbehorende ebook in dezelfde folder
+TESTEDBYUSER: Hernoemt metadata.opf naar {ebook_naam}.opf (bijv. Book.epub.opf)
+TESTEDBYUSER: Hernoemt de book cover van coverimage.jpg naar {ebook_naam}.jpg (bijv. Book.epub.jpg)
+TESTEDBYUSER: Toont eerst een preview (dry run) voor bevestiging
+TESTEDBYUSER: Waarschuwt dat Calibre de hernoemde metadata.opf niet meer ziet
+TESTEDBYUSER: CLI support: python Calibre2Libiry.py [calibre_library_path]
+TESTEDBYUSER: Windows batch: Calibre2Libiry.bat voor makkelijk starten

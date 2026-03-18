@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Libiry
+Comment=E-book library manager
+Exec=Libiry
+Icon=libiry
+Type=Application
+Categories=Office;Viewer;
+Terminal=false
+StartupWMClass=Libiry

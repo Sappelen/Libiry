@@ -1,0 +1,72 @@
+LIBIRY INSTALLATION
+===================
+
+Libiry is available for Windows, macOS, Linux and Android.
+
+
+WINDOWS
+-------
+1. Download LibirySetup.exe
+2. Double-click the file
+3. Follow the installation wizard
+4. Libiry is now in your Start Menu and on your desktop
+
+Uninstall: via Windows Settings > Apps > Libiry > Uninstall
+
+
+MACOS
+-----
+Option A: DMG (recommended)
+1. Download Libiry.dmg
+2. Double-click to open
+3. Drag Libiry to the Applications folder
+4. Launch from Applications or Spotlight
+
+Option B: Direct .app
+1. Download Libiry.app
+2. Move to Applications folder
+3. First launch: Right-click > Open (to bypass Gatekeeper)
+
+Uninstall: drag Libiry from Applications to Trash
+
+
+LINUX
+-----
+1. Download Libiry-x86_64.AppImage
+2. Make the file executable:
+   - Right-click > Properties > Permissions > "Allow executing as program"
+   - Or via terminal: chmod +x Libiry-x86_64.AppImage
+3. Double-click to start
+
+Optional - Desktop integration:
+   ./Libiry-x86_64.AppImage --install
+
+Uninstall: delete the AppImage file
+
+
+ANDROID
+-------
+1. Download libiry.apk to your phone
+2. Tap the file to install
+3. If prompted about "unknown sources": tap Settings and allow installation
+4. Libiry is now in your apps
+
+Uninstall: long-press the app icon > Uninstall
+
+
+FIRST TIME STARTUP
+------------------
+When starting for the first time:
+1. Choose a start location (the folder where your ebooks are stored)
+2. Libiry displays your ebooks as visual tiles
+3. Double-click a book to open it
+4. Use the gear icon for settings
+
+
+TROUBLESHOOTING
+---------------
+- Windows Defender warning: click "More info" > "Run anyway"
+- macOS "cannot be verified": Right-click > Open > Open
+- macOS "app is damaged": run in Terminal: xattr -cr /Applications/Libiry.app
+- Linux: make sure the file is executable (chmod +x)
+- Android: allow installation from unknown sources in Settings

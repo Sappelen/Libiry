@@ -33,3 +33,13 @@ backups/
 
 # Test files
 test_*.py
+_test*.epub
+
+# Build output
+build/
+dist/
+*.spec
+
+# Old/backup icons
+resources/icons/oud/
+resources/icons/Icons/

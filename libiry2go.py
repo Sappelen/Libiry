@@ -4,10 +4,7 @@ Libiry2Go - Portable book catalog generator
 
 Creates markdown files from your ebook library that you can take on your phone.
 Extracts metadata from ebooks and markdown files.
-
-Output formats:
-- Books per file = 1: One file per book (Obsidian format, YAML frontmatter)
-- Books per file > 1: Multiple books per file (Libiry format, flat key: value)
+One file per book in Obsidian format (YAML frontmatter).
 
 Uses Libiry's customize.txt for field name configuration, so your field names stay consistent.
 
@@ -15,7 +12,6 @@ Usage:
     python libiry2go.py                          # Opens GUI for folder selection
     python libiry2go.py "C:/Books"               # Scan folder, output next to it
     python libiry2go.py "C:/Books" "C:/Out"      # Scan folder, custom output location
-    python libiry2go.py "C:/Books" "C:/Out" 1    # One file per book (Obsidian format)
 """
 
 import sys
@@ -26,6 +22,15 @@ from typing import Dict, List
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import threading
+
+# Windows taakbalk icoon fix: stel AppUserModelID in zodat Windows
+# het juiste icoon toont in de taakbalk in plaats van het Python icoon
+try:
+    import ctypes
+    # Unieke ID voor Libiry apps - Windows groepeert vensters met dezelfde ID
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('Libiry.Libiry2Go.1')
+except (ImportError, AttributeError, OSError):
+    pass  # Niet op Windows of ctypes niet beschikbaar
 
 # Voeg Libiry's core folder toe aan path zodat we de extractors kunnen gebruiken
 SCRIPT_DIR = Path(__file__).parent
@@ -43,28 +48,35 @@ except ImportError:
 # Configuration
 # =============================================================================
 
-MAX_BOOKS_PER_FILE = 100  # Consistent met Libiry limiet
 
-# Ondersteunde bestandstypes
+# Default bestandstypes (fallback als selected types.txt niet bestaat)
+DEFAULT_EXTENSIONS = {'.epub', '.mobi', '.azw', '.azw3', '.pdf', '.cbr', '.cbz', '.md', '.markdown'}
+
+# Extensies waarvoor metadata extractie mogelijk is
 EBOOK_EXTENSIONS = {'.epub', '.mobi', '.azw', '.azw3', '.pdf', '.cbr', '.cbz'}
 MARKDOWN_EXTENSIONS = {'.md', '.markdown'}
-# Alle andere bestandstypes worden ook meegenomen met basis info
 
 # Volgorde gebaseerd op Goodreads CSV export voor maximale compatibiliteit
 DEFAULT_FIELD_NAMES = {
     'cover': 'cover',              # UI: cover afbeelding
     'booktitle': 'booktitle',      # Goodreads: Title
     'author': 'author',            # Goodreads: Author
+    'author_sort': 'author_sort',  # Sorteer naam auteur (opf:file-as)
     'isbn': 'isbn',                # Goodreads: ISBN
     'rating': 'rating',            # Goodreads: My Rating
     'publisher': 'publisher',      # Goodreads: Publisher
-    'year': 'year',                # Goodreads: Year Published
-    'language': 'language',        # Extra: taal
+    'publication_date': 'publication_date',  # Volledige publicatiedatum
+    'language': 'language',        # Taal
+    'pages': 'pages',              # Aantal pagina's
     'tags': 'tags',                # Goodreads: Bookshelves
-    'series': 'series',            # Extra: serie naam
-    'series_index': 'series_index',# Extra: serie volgnummer
+    'series': 'series',            # Serie naam
+    'series_index': 'series_index',# Serie volgnummer
+    'translator': 'translator',    # Vertaler
+    'illustrator': 'illustrator',  # Illustrator
     'description': 'description',  # Goodreads: My Review
     'notes': 'notes',              # Goodreads: Private Notes
+    'file_created': 'file_created',    # Libiry2Go: bestand aanmaakdatum
+    'file_modified': 'file_modified',  # Libiry2Go: bestand wijzigingsdatum
 }
 
 
@@ -75,26 +87,52 @@ def load_field_names_from_libiry() -> Dict[str, str]:
     """
     field_names = DEFAULT_FIELD_NAMES.copy()
 
-    customize_file = SCRIPT_DIR / 'customize' / 'customize.txt'
-    if not customize_file.exists():
-        return field_names
+    # Check beide locaties: eerst customize folder, dan resources folder
+    for folder in ['customize', 'resources']:
+        customize_file = SCRIPT_DIR / folder / 'customize.txt'
+        if not customize_file.exists():
+            continue
 
-    try:
-        content = customize_file.read_text(encoding='utf-8')
-        for line in content.split('\n'):
-            line = line.strip()
-            if line.startswith('Field name '):
-                # Format: "Field name cover: coverimage"
-                parts = line.split(':', 1)
-                if len(parts) == 2:
-                    field_part = parts[0].replace('Field name ', '').strip()
-                    value = parts[1].strip()
-                    if field_part in field_names and value:
-                        field_names[field_part] = value
-    except Exception as e:
-        print(f"Warning: Could not read customize.txt: {e}")
+        try:
+            content = customize_file.read_text(encoding='utf-8')
+            for line in content.split('\n'):
+                line = line.strip()
+                if line.startswith('Field name '):
+                    # Format: "Field name cover: coverimage"
+                    parts = line.split(':', 1)
+                    if len(parts) == 2:
+                        field_part = parts[0].replace('Field name ', '').strip()
+                        value = parts[1].strip()
+                        if field_part in field_names and value:
+                            field_names[field_part] = value
+        except Exception as e:
+            print(f"Warning: Could not read {customize_file}: {e}")
 
     return field_names
+
+
+def load_selected_types_from_libiry() -> set:
+    """
+    Laad geselecteerde bestandstypes uit Libiry's selected types.txt.
+    Zoekt eerst in customize folder, dan in resources folder.
+    """
+    # Check beide locaties: eerst customize folder, dan resources folder
+    for folder in ['customize', 'resources']:
+        types_path = SCRIPT_DIR / folder / 'selected types.txt'
+        if types_path.exists():
+            try:
+                content = types_path.read_text(encoding='utf-8')
+                types = set()
+                for line in content.split('\n'):
+                    line = line.strip().lower()
+                    if line and line.startswith('.'):
+                        types.add(line)
+                if types:
+                    return types
+            except Exception as e:
+                print(f"Warning: Could not read {types_path}: {e}")
+
+    return DEFAULT_EXTENSIONS
 
 
 def format_file_size(size_bytes: int) -> str:
@@ -135,23 +173,36 @@ class SimpleMetadataExtractor:
         Returns dict met alle boek metadata velden in Goodreads volgorde.
         """
         # Volgorde gebaseerd op Goodreads CSV export
+        # Haal file stats op voor size en dates
+        file_stat = filepath.stat() if filepath.exists() else None
+        file_size = format_file_size(file_stat.st_size) if file_stat else ''
+        # File dates in YYYY-MM-DD formaat voor Obsidian dashboard
+        file_created = datetime.fromtimestamp(file_stat.st_ctime).strftime('%Y-%m-%d') if file_stat else ''
+        file_modified = datetime.fromtimestamp(file_stat.st_mtime).strftime('%Y-%m-%d') if file_stat else ''
+
         result = {
             'cover': '',                # UI: cover afbeelding
             'booktitle': filepath.stem, # Goodreads: Title
             'author': '',               # Goodreads: Author
+            'author_sort': '',          # Sorteer naam auteur
             'isbn': '',                 # Goodreads: ISBN
             'rating': '',               # Goodreads: My Rating
             'publisher': '',            # Goodreads: Publisher
-            'year': '',                 # Goodreads: Year Published
-            'language': '',             # Extra: taal
+            'publication_date': '',     # Volledige publicatiedatum
+            'language': '',             # Taal
+            'pages': '',                # Aantal pagina's
             'tags': '',                 # Goodreads: Bookshelves
-            'series': '',               # Extra: serie naam
-            'series_index': '',         # Extra: serie volgnummer
+            'series': '',               # Serie naam
+            'series_index': '',         # Serie volgnummer
+            'translator': '',           # Vertaler
+            'illustrator': '',          # Illustrator
             'description': '',          # Goodreads: My Review
-            'notes': '',                # Goodreads: Private Notes (altijd leeg bij extractie)
-            'size': format_file_size(filepath.stat().st_size) if filepath.exists() else '',
+            'notes': '',                # Goodreads: Private Notes
+            'size': file_size,
             'type': filepath.suffix.lower().lstrip('.'),
             'path': str(filepath),
+            'file_created': file_created,    # Voor Obsidian dashboard
+            'file_modified': file_modified,  # Voor Obsidian dashboard
         }
 
         ext = filepath.suffix.lower()
@@ -162,19 +213,24 @@ class SimpleMetadataExtractor:
                 if ext in EBOOK_EXTENSIONS or ext in MARKDOWN_EXTENSIONS:
                     meta = self.libiry_extractor.extract(filepath)
                     if meta:
-                        # Volgorde: Goodreads CSV export
+                        # Volgorde: Goodreads CSV export + extra velden
                         result['cover'] = meta.cover_url or ''
                         result['booktitle'] = meta.booktitle or filepath.stem
                         result['author'] = ', '.join(meta.authors) if meta.authors else ''
+                        result['author_sort'] = meta.author_sort or ''
                         result['isbn'] = meta.isbn or ''
                         result['rating'] = str(meta.rating) if meta.rating else ''
                         result['publisher'] = meta.publisher or ''
-                        result['year'] = meta.year or ''
+                        result['publication_date'] = meta.publication_date or ''
                         result['language'] = meta.language or ''
+                        result['pages'] = meta.pages or ''
                         result['tags'] = ', '.join(meta.tags) if meta.tags else ''
                         result['series'] = meta.series or ''
                         result['series_index'] = str(meta.series_index) if meta.series_index else ''
+                        result['translator'] = meta.translator or ''
+                        result['illustrator'] = meta.illustrator or ''
                         result['description'] = meta.description or ''
+                        result['notes'] = meta.notes or ''
             else:
                 # Fallback: basis extractie voor EPUB
                 if ext == '.epub':
@@ -236,10 +292,21 @@ class SimpleMetadataExtractor:
                     for identifier in root.findall('.//dc:identifier', dc_ns):
                         text = identifier.text or ''
                         scheme = identifier.get('{http://www.idpf.org/2007/opf}scheme', '').lower()
+                        # Skip UUID waarden
+                        if text.lower().startswith('urn:uuid:'):
+                            continue
                         if 'isbn' in scheme or 'isbn' in text.lower():
-                            # Clean ISBN
-                            isbn = ''.join(c for c in text if c.isdigit() or c == 'X')
-                            if len(isbn) in (10, 13):
+                            isbn = text.strip()
+                            # Verwijder eventuele ISBN: prefix
+                            for prefix in ['ISBN:', 'ISBN-10:', 'ISBN-13:']:
+                                if isbn.upper().startswith(prefix):
+                                    isbn = isbn[len(prefix):].strip()
+                                    break
+                            # Clean als exact 10 of 13 cijfers
+                            cleaned = ''.join(c for c in isbn.upper() if c.isdigit() or c == 'X')
+                            if len(cleaned) in (10, 13):
+                                isbn = cleaned
+                            if isbn:
                                 result['isbn'] = isbn
                                 break
 
@@ -298,6 +365,9 @@ class SimpleMetadataExtractor:
 def scan_folder(folder: Path, progress_callback=None) -> List[Dict[str, str]]:
     """
     Scan een folder recursief en verzamel metadata van alle bestanden.
+
+    Als er meerdere bestanden zijn met dezelfde booktitle+author (bijv. een .epub
+    en .md van hetzelfde boek), krijgen ze (1), (2) etc. toegevoegd aan de titel.
     """
     field_names = load_field_names_from_libiry()
     extractor = SimpleMetadataExtractor(field_names)
@@ -305,7 +375,9 @@ def scan_folder(folder: Path, progress_callback=None) -> List[Dict[str, str]]:
     books = []
     all_files = []
 
-    # Verzamel eerst alle bestanden
+    # Laad geselecteerde bestandstypes uit Libiry settings
+    valid_extensions = load_selected_types_from_libiry()
+
     for root, dirs, files in os.walk(folder):
         # Skip hidden folders
         dirs[:] = [d for d in dirs if not d.startswith('.')]
@@ -314,7 +386,9 @@ def scan_folder(folder: Path, progress_callback=None) -> List[Dict[str, str]]:
             if filename.startswith('.'):
                 continue
             filepath = Path(root) / filename
-            all_files.append(filepath)
+            # Alleen bestanden met geselecteerde extensies meenemen
+            if filepath.suffix.lower() in valid_extensions:
+                all_files.append(filepath)
 
     total = len(all_files)
 
@@ -325,9 +399,11 @@ def scan_folder(folder: Path, progress_callback=None) -> List[Dict[str, str]]:
         try:
             # Relatief pad voor weergave
             rel_path = filepath.relative_to(folder)
+            rel_path_posix = rel_path.as_posix()
 
+            # Extractie metadata
             metadata = extractor.extract(filepath)
-            metadata['file'] = str(rel_path)
+            metadata['file'] = rel_path_posix
 
             books.append(metadata)
         except Exception as e:
@@ -335,6 +411,24 @@ def scan_folder(folder: Path, progress_callback=None) -> List[Dict[str, str]]:
 
     # Sorteer op booktitle
     books.sort(key=lambda b: b.get('booktitle', '').lower())
+
+    # Detecteer duplicaten op basis van booktitle+author en voeg (1), (2) toe
+    # Dit zorgt ervoor dat bijv. book.epub en book.md beide in de output komen
+    title_author_count = {}
+    for book in books:
+        key = (book.get('booktitle', '').lower(), book.get('author', '').lower())
+        title_author_count[key] = title_author_count.get(key, 0) + 1
+
+    # Tweede pass: voeg nummers toe aan duplicaten
+    title_author_seen = {}
+    for book in books:
+        key = (book.get('booktitle', '').lower(), book.get('author', '').lower())
+        if title_author_count[key] > 1:
+            # Er zijn meerdere boeken met deze titel+author
+            seen = title_author_seen.get(key, 0) + 1
+            title_author_seen[key] = seen
+            # Voeg (1), (2) etc. toe aan de booktitle
+            book['booktitle'] = f"{book.get('booktitle', '')} ({seen})"
 
     return books
 
@@ -344,169 +438,82 @@ def sanitize_filename(name: str) -> str:
     return ''.join(c if c not in '<>:"/\\|?*' else '_' for c in name)[:200]
 
 
+def clean_quotes(value: str) -> str:
+    """
+    Verwijder interne dubbele quotes uit een string.
+    Dit voorkomt YAML parsing problemen in Obsidian wanneer velden
+    worden omgeven door quotes en er ook quotes in de waarde staan.
+    """
+    if not value:
+        return value
+    return value.replace('"', '')
+
+
 def generate_markdown_files(books: List[Dict[str, str]],
                            output_folder: Path,
-                           field_names: Dict[str, str],
-                           books_per_file: int = MAX_BOOKS_PER_FILE) -> List[Path]:
+                           field_names: Dict[str, str]) -> List[Path]:
     """
     Genereer markdown bestanden van de boekenlijst.
+    Één bestand per boek in Obsidian format (YAML frontmatter).
 
     Args:
         books: Lijst met book metadata dicts
         output_folder: Output folder
         field_names: Veldnamen configuratie
-        books_per_file: Aantal boeken per bestand (1-100).
-                       1 = Obsidian format (één file per boek, YAML frontmatter)
-                       >1 = Libiry format (meerdere boeken per file, flat key: value)
     """
     output_folder.mkdir(parents=True, exist_ok=True)
-
-    # Clamp books_per_file to valid range
-    books_per_file = max(1, min(100, books_per_file))
-
     generated_files = []
-    date_str = datetime.now().strftime('%Y-%m-%d')
 
-    if books_per_file == 1:
-        # === OBSIDIAN FORMAT: één file per boek ===
-        # Dezelfde layout als BookSpineScanner's Obsidian export
-        for book in books:
-            # Filename: [author] - [booktitle].md
-            author = book.get('author', 'Unknown') or 'Unknown'
-            title = book.get('booktitle', 'Untitled') or 'Untitled'
-            filename = sanitize_filename(f"{author} - {title}.md")
+    for book in books:
+        # Filename: [author] - [booktitle].md
+        author = book.get('author', 'Unknown') or 'Unknown'
+        title = book.get('booktitle', 'Untitled') or 'Untitled'
+        filename = sanitize_filename(f"{author} - {title}.md")
+        filepath = output_folder / filename
+
+        # Voorkom duplicaten door nummer toe te voegen
+        counter = 1
+        while filepath.exists():
+            filename = sanitize_filename(f"{author} - {title} ({counter}).md")
             filepath = output_folder / filename
+            counter += 1
 
-            # Voorkom duplicaten door nummer toe te voegen
-            counter = 1
-            while filepath.exists():
-                filename = sanitize_filename(f"{author} - {title} ({counter}).md")
-                filepath = output_folder / filename
-                counter += 1
+        # YAML frontmatter met Libiry veldnamen
+        lines = [
+            '---',
+            f'{field_names["cover"]}: "{clean_quotes(book.get("cover", ""))}"',
+            f'{field_names["booktitle"]}: "{clean_quotes(title)}"',
+            f'{field_names["author"]}: "{clean_quotes(author)}"',
+            f'{field_names["author_sort"]}: "{clean_quotes(book.get("author_sort", ""))}"',
+            f'{field_names["isbn"]}: "{clean_quotes(book.get("isbn", ""))}"',
+            f'{field_names["rating"]}: "{clean_quotes(book.get("rating", ""))}"',
+            f'{field_names["publisher"]}: "{clean_quotes(book.get("publisher", ""))}"',
+            f'{field_names["publication_date"]}: "{clean_quotes(book.get("publication_date", ""))}"',
+            f'{field_names["language"]}: "{clean_quotes(book.get("language", ""))}"',
+            f'{field_names["pages"]}: "{clean_quotes(book.get("pages", ""))}"',
+            f'{field_names["tags"]}: [{clean_quotes(book.get("tags", ""))}]',
+            f'{field_names["series"]}: "{clean_quotes(book.get("series", ""))}"',
+            f'{field_names["series_index"]}: "{clean_quotes(book.get("series_index", ""))}"',
+            f'{field_names["translator"]}: "{clean_quotes(book.get("translator", ""))}"',
+            f'{field_names["illustrator"]}: "{clean_quotes(book.get("illustrator", ""))}"',
+            f'{field_names["description"]}: "{clean_quotes(book.get("description", ""))}"',
+            f'{field_names["notes"]}: "{clean_quotes(book.get("notes", ""))}"',
+            f'file: "{clean_quotes(book.get("file", ""))}"',
+            f'size: "{clean_quotes(book.get("size", ""))}"',
+            f'type: "{clean_quotes(book.get("type", ""))}"',
+            f'{field_names["file_created"]}: {book.get("file_created", "")}',
+            f'{field_names["file_modified"]}: {book.get("file_modified", "")}',
+            f'generated: {datetime.now().isoformat()}',
+            f'generator: Libiry2Go',
+            '---',
+            '',
+            f'# {clean_quotes(title)}',
+            '',
+            ''
+        ]
 
-            # Alles in YAML frontmatter
-            # Volgorde gebaseerd op Goodreads CSV export
-            lines = [
-                '---',
-                f'{field_names["cover"]}: "{book.get("cover", "")}"',
-                f'{field_names["booktitle"]}: "{title}"',
-                f'{field_names["author"]}: "{author}"',
-                f'{field_names["isbn"]}: "{book.get("isbn", "")}"',
-                f'{field_names["rating"]}: "{book.get("rating", "")}"',
-                f'{field_names["publisher"]}: "{book.get("publisher", "")}"',
-                f'{field_names["year"]}: "{book.get("year", "")}"',
-                f'{field_names["language"]}: "{book.get("language", "")}"',
-                f'{field_names["tags"]}: "{book.get("tags", "")}"',
-                f'{field_names["series"]}: "{book.get("series", "")}"',
-                f'{field_names["series_index"]}: "{book.get("series_index", "")}"',
-                f'{field_names["description"]}: "{book.get("description", "")}"',
-                f'{field_names["notes"]}: "{book.get("notes", "")}"',
-                f'file: "{book.get("file", "")}"',
-                f'size: "{book.get("size", "")}"',
-                f'type: "{book.get("type", "")}"',
-                f'generated: {datetime.now().isoformat()}',
-                f'generator: Libiry2Go',
-                '---',
-                '',
-                f'# {title}',
-                '',
-                ''
-            ]
-
-            filepath.write_text('\n'.join(lines), encoding='utf-8')
-            generated_files.append(filepath)
-    else:
-        # === LIBIRY FORMAT: meerdere boeken per file ===
-        # Split in chunks
-        chunks = []
-        for i in range(0, len(books), books_per_file):
-            chunks.append(books[i:i + books_per_file])
-
-        for chunk_idx, chunk in enumerate(chunks):
-            # Filename
-            if len(chunks) == 1:
-                filename = f"libiry2go_{date_str}.md"
-            else:
-                filename = f"libiry2go_{date_str}_part{chunk_idx + 1}.md"
-
-            filepath = output_folder / filename
-
-            # Header
-            lines = [
-                '---',
-                f'generated: {datetime.now().isoformat()}',
-                f'generator: Libiry2Go',
-                f'books_in_file: {len(chunk)}',
-                f'books_total: {len(books)}',
-            ]
-            if len(chunks) > 1:
-                lines.append(f'part: {chunk_idx + 1} of {len(chunks)}')
-            lines.extend(['---', ''])
-
-            # Books (flat key: value format)
-            # Volgorde gebaseerd op Goodreads CSV export
-            for book in chunk:
-                # Cover - ALTIJD schrijven, ook als leeg!
-                # Libiry gebruikt cover: als delimiter voor multi-book files
-                lines.append(f"{field_names['cover']}: {book.get('cover', '')}")
-
-                # Booktitle (Goodreads: Title)
-                lines.append(f"{field_names['booktitle']}: {book.get('booktitle', '')}")
-
-                # Author (Goodreads: Author)
-                if book.get('author'):
-                    lines.append(f"{field_names['author']}: {book['author']}")
-
-                # ISBN
-                if book.get('isbn'):
-                    lines.append(f"{field_names['isbn']}: {book['isbn']}")
-
-                # Rating (Goodreads: My Rating - komt vroeg in Goodreads export)
-                if book.get('rating'):
-                    lines.append(f"{field_names['rating']}: {book['rating']}")
-
-                # Publisher (Goodreads: Publisher)
-                if book.get('publisher'):
-                    lines.append(f"{field_names['publisher']}: {book['publisher']}")
-
-                # Year (Goodreads: Year Published)
-                if book.get('year'):
-                    lines.append(f"{field_names['year']}: {book['year']}")
-
-                # Language (extra, niet in Goodreads)
-                if book.get('language'):
-                    lines.append(f"{field_names['language']}: {book['language']}")
-
-                # Tags (Goodreads: Bookshelves)
-                if book.get('tags'):
-                    lines.append(f"{field_names['tags']}: {book['tags']}")
-
-                # Series (extra, niet in Goodreads)
-                if book.get('series'):
-                    lines.append(f"{field_names['series']}: {book['series']}")
-                if book.get('series_index'):
-                    lines.append(f"{field_names['series_index']}: {book['series_index']}")
-
-                # Description (Goodreads: My Review)
-                if book.get('description'):
-                    lines.append(f"{field_names['description']}: {book['description']}")
-
-                # Notes (Goodreads: Private Notes)
-                if book.get('notes'):
-                    lines.append(f"{field_names['notes']}: {book['notes']}")
-
-                # File info (Libiry-specifiek)
-                lines.append(f"file: {book.get('file', '')}")
-                if book.get('size'):
-                    lines.append(f"size: {book['size']}")
-                if book.get('type'):
-                    lines.append(f"type: {book['type']}")
-
-                lines.append('')  # Lege regel tussen boeken
-
-            # Schrijf bestand
-            filepath.write_text('\n'.join(lines), encoding='utf-8')
-            generated_files.append(filepath)
+        filepath.write_text('\n'.join(lines), encoding='utf-8')
+        generated_files.append(filepath)
 
     return generated_files
 
@@ -518,28 +525,56 @@ def generate_markdown_files(books: List[Dict[str, str]],
 class Libiry2GoApp:
     """GUI voor Libiry2Go in Libiry stijl."""
 
-    # Libiry kleuren (uit customize.txt)
-    BG_COLOR = '#6F9D9F'      # Teal achtergrond
-    BTN_COLOR = '#793F4E'     # Bordeaux knoppen
-    BTN_FONT_COLOR = 'black'
-    BG_FONT_COLOR = 'white'
-    ENTRY_BG = 'white'
-
     def __init__(self):
+        # Laad Libiry styling uit customize.txt
+        self._load_style()
+
         self.root = tk.Tk()
         self.root.title("Libiry2Go")
         self.root.geometry("550x380")
         self.root.resizable(True, True)
         self.root.configure(bg=self.BG_COLOR)
 
+        # Libiry icoon in Windows taakbalk
+        # iconbitmap moet VOOR mainloop aangeroepen worden, en pad moet absoluut zijn
+        icon_path = SCRIPT_DIR / 'resources' / 'icons' / 'Libiry.ico'
+        try:
+            if icon_path.exists():
+                # default="" zet ook het icoon in de taakbalk
+                self.root.iconbitmap(default=str(icon_path))
+        except tk.TclError:
+            pass  # Icoon niet gevonden of niet ondersteund
+
         # Configureer ttk style voor Libiry look
         self._configure_style()
 
         self.input_folder = tk.StringVar()
         self.output_folder = tk.StringVar()
-        self.books_per_file = tk.IntVar(value=100)
 
         self._create_widgets()
+
+    def _load_style(self):
+        """Laad styling uit Libiry's customize.txt."""
+        try:
+            from core.libiry_style import load_libiry_style
+            style = load_libiry_style(SCRIPT_DIR)
+        except ImportError:
+            # Fallback als module niet gevonden
+            style = {
+                'background_color': '#6F9D9F',
+                'button_color': '#793F4E',
+                'button_font_color': '#FFFFFF',
+                'background_font_color': '#000000',
+                'search_box_color': '#FFFFFF',
+                'font_size': 12,
+            }
+
+        self.BG_COLOR = style.get('background_color', '#6F9D9F')
+        self.BTN_COLOR = style.get('button_color', '#793F4E')
+        self.BTN_FONT_COLOR = style.get('button_font_color', '#FFFFFF')
+        self.BG_FONT_COLOR = style.get('background_font_color', '#000000')
+        self.ENTRY_BG = style.get('search_box_color', '#FFFFFF')
+        self.FONT_SIZE = style.get('font_size', 12)
 
     def _configure_style(self):
         """Configureer ttk styling om Libiry kleuren te gebruiken."""
@@ -548,27 +583,108 @@ class Libiry2GoApp:
         # Frame achtergrond
         style.configure('TFrame', background=self.BG_COLOR)
 
-        # Labels met witte tekst op teal achtergrond
-        style.configure('TLabel', background=self.BG_COLOR, foreground=self.BG_FONT_COLOR)
+        # Labels met achtergrond font kleur
+        style.configure('TLabel', background=self.BG_COLOR, foreground=self.BG_FONT_COLOR,
+                       font=('Helvetica', self.FONT_SIZE))
         style.configure('Title.TLabel', background=self.BG_COLOR, foreground=self.BG_FONT_COLOR,
-                       font=('Helvetica', 18, 'bold'))
-        style.configure('Subtitle.TLabel', background=self.BG_COLOR, foreground=self.BG_FONT_COLOR)
-        style.configure('Hint.TLabel', background=self.BG_COLOR, foreground='#d0d0d0')
-
-        # Knoppen in Libiry bordeaux
-        style.configure('TButton', background=self.BTN_COLOR, foreground=self.BTN_FONT_COLOR,
-                       padding=(10, 5))
-        style.map('TButton',
-                 background=[('active', '#5a2f3b'), ('pressed', '#4a252e')])
+                       font=('Helvetica', self.FONT_SIZE + 6, 'bold'))
+        style.configure('Subtitle.TLabel', background=self.BG_COLOR, foreground=self.BG_FONT_COLOR,
+                       font=('Helvetica', self.FONT_SIZE))
+        # Hint tekst in zelfde kleur als achtergrond font, maar iets lichter
+        style.configure('Hint.TLabel', background=self.BG_COLOR, foreground=self.BG_FONT_COLOR,
+                       font=('Helvetica', self.FONT_SIZE - 1))
 
         # Entry velden
-        style.configure('TEntry', fieldbackground=self.ENTRY_BG)
+        style.configure('TEntry', fieldbackground=self.ENTRY_BG,
+                       font=('Helvetica', self.FONT_SIZE))
 
         # Spinbox
-        style.configure('TSpinbox', fieldbackground=self.ENTRY_BG)
+        style.configure('TSpinbox', fieldbackground=self.ENTRY_BG,
+                       font=('Helvetica', self.FONT_SIZE))
 
-        # Progress bar in Libiry bordeaux
-        style.configure('TProgressbar', background=self.BTN_COLOR, troughcolor='#d0d0d0')
+    def _create_button(self, parent, text, command):
+        """Maak een button met Libiry styling (tk.Button voor correcte kleuren)."""
+        btn = tk.Button(
+            parent,
+            text=text,
+            command=command,
+            bg=self.BTN_COLOR,
+            fg=self.BTN_FONT_COLOR,
+            activebackground=self.BTN_COLOR,
+            activeforeground=self.BTN_FONT_COLOR,
+            font=('Helvetica', self.FONT_SIZE),
+            relief='flat',  # Geen border
+            borderwidth=0,
+            padx=15,
+            pady=7,
+            cursor='hand2'
+        )
+        return btn
+
+    def _create_entry(self, parent, textvariable, width=40):
+        """
+        Maak een entry veld met Libiry styling.
+        Zelfde font en hoogte als buttons voor consistente look.
+        """
+        entry = tk.Entry(
+            parent,
+            textvariable=textvariable,
+            width=width,
+            font=('Helvetica', self.FONT_SIZE),  # Zelfde font als buttons
+            bg=self.ENTRY_BG,
+            relief='flat',
+            borderwidth=0,
+            # Hoogte gelijk aan buttons: buttons hebben pady=5, entry gebruikt ipady
+            # voor interne verticale padding om dezelfde hoogte te krijgen
+        )
+        # ipady via pack/grid voor consistente hoogte met buttons
+        return entry
+
+    def _create_entry_with_button(self, parent, textvariable, button_text, button_command, entry_width=40):
+        """
+        Maak een gecombineerd veld met entry en button direct tegen elkaar aan.
+        Entry en button hebben dezelfde hoogte en font voor consistente look.
+
+        De button bepaalt de hoogte (font + 2*pady). Entry moet dezelfde hoogte krijgen
+        via ipady. Buttons hebben pady=7, dus entry krijgt ipady=7.
+        """
+        # Frame zonder padding tussen entry en button
+        frame = ttk.Frame(parent)
+
+        # Entry met zelfde font als button
+        # ipady=7 zorgt voor zelfde hoogte als button met pady=7
+        entry = tk.Entry(
+            frame,
+            textvariable=textvariable,
+            width=entry_width,
+            font=('Helvetica', self.FONT_SIZE),
+            bg=self.ENTRY_BG,
+            relief='flat',
+            borderwidth=0,
+        )
+        entry.pack(side='left', ipady=7, fill='y')
+
+        # Button direct aansluitend
+        # padx=15 zodat "Browse..." volledig zichtbaar is
+        # pady=7 voor voldoende hoogte
+        btn = tk.Button(
+            frame,
+            text=button_text,
+            command=button_command,
+            bg=self.BTN_COLOR,
+            fg=self.BTN_FONT_COLOR,
+            activebackground=self.BTN_COLOR,
+            activeforeground=self.BTN_FONT_COLOR,
+            font=('Helvetica', self.FONT_SIZE),
+            relief='flat',
+            borderwidth=0,
+            padx=15,
+            pady=7,
+            cursor='hand2'
+        )
+        btn.pack(side='left')
+
+        return frame
 
     def _create_widgets(self):
         # Main frame with padding
@@ -586,58 +702,30 @@ class Libiry2GoApp:
                             style='Subtitle.TLabel')
         subtitle.grid(row=1, column=0, columnspan=3, pady=(0, 20))
 
-        # Input folder
+        # Input folder - entry en button direct tegen elkaar aan, zelfde hoogte en font
+        # Consistente verticale spacing (pady=8) tussen alle form rows
         ttk.Label(main, text="Library folder:").grid(row=2, column=0, sticky="w", pady=8)
-        ttk.Entry(main, textvariable=self.input_folder, width=40).grid(row=2, column=1, sticky="ew", padx=5)
-        ttk.Button(main, text="Browse...", command=self._browse_input).grid(row=2, column=2)
+        input_frame = self._create_entry_with_button(
+            main, self.input_folder, "...", self._browse_input)
+        input_frame.grid(row=2, column=1, columnspan=2, sticky="w", pady=8)
 
-        # Output folder
+        # Output folder - entry en button direct tegen elkaar aan, zelfde hoogte en font
         ttk.Label(main, text="Output folder:").grid(row=3, column=0, sticky="w", pady=8)
-        ttk.Entry(main, textvariable=self.output_folder, width=40).grid(row=3, column=1, sticky="ew", padx=5)
-        ttk.Button(main, text="Browse...", command=self._browse_output).grid(row=3, column=2)
+        output_frame = self._create_entry_with_button(
+            main, self.output_folder, "...", self._browse_output)
+        output_frame.grid(row=3, column=1, columnspan=2, sticky="w", pady=8)
 
-        # Books per file
-        ttk.Label(main, text="Books per file:").grid(row=4, column=0, sticky="w", pady=8)
-        bpf_frame = ttk.Frame(main)
-        bpf_frame.grid(row=4, column=1, columnspan=2, sticky="w", padx=5)
-
-        self.bpf_spinbox = ttk.Spinbox(bpf_frame, from_=1, to=100, width=5,
-                                        textvariable=self.books_per_file)
-        self.bpf_spinbox.grid(row=0, column=0)
-
-        self.bpf_hint = ttk.Label(bpf_frame, text="(1 = one file per book)", style='Hint.TLabel')
-        self.bpf_hint.grid(row=0, column=1, padx=(10, 0))
-
-        # Update hint when value changes
-        self.books_per_file.trace_add('write', self._update_bpf_hint)
-
-        # Progress
+        # Progress (tekst ipv balk, zoals Calibre2Libiry)
         self.progress_label = ttk.Label(main, text="")
-        self.progress_label.grid(row=5, column=0, columnspan=3, pady=(20, 5))
-
-        self.progress_bar = ttk.Progressbar(main, mode='determinate', length=300)
-        self.progress_bar.grid(row=6, column=0, columnspan=3, sticky="ew", pady=5)
+        self.progress_label.grid(row=4, column=0, columnspan=3, pady=(20, 5))
 
         # Generate button
-        self.generate_btn = ttk.Button(main, text="Generate Catalog", command=self._generate)
-        self.generate_btn.grid(row=7, column=0, columnspan=3, pady=20)
+        self.generate_btn = self._create_button(main, "Generate Catalog", self._generate)
+        self.generate_btn.grid(row=5, column=0, columnspan=3, pady=20)
 
         # Status
         self.status_label = ttk.Label(main, text="")
-        self.status_label.grid(row=8, column=0, columnspan=3)
-
-    def _update_bpf_hint(self, *args):
-        """Update hint text based on books_per_file value."""
-        try:
-            val = self.books_per_file.get()
-            if val == 1:
-                self.bpf_hint.config(text="(one file per book)")
-            elif val >= 100:
-                self.bpf_hint.config(text="(max 100 for Libiry compatibility)")
-            else:
-                self.bpf_hint.config(text=f"(creates ~{max(1, 1000 // val)} files per 1000 books)")
-        except tk.TclError:
-            pass  # Invalid value during typing
+        self.status_label.grid(row=6, column=0, columnspan=3)
 
     def _browse_input(self):
         folder = filedialog.askdirectory(title="Select your book library folder")
@@ -668,23 +756,16 @@ class Libiry2GoApp:
             output_path = str(Path(input_path).parent / "Libiry2Go_Output")
             self.output_folder.set(output_path)
 
-        # Get books per file (clamp to valid range)
-        try:
-            bpf = max(1, min(100, self.books_per_file.get()))
-        except tk.TclError:
-            bpf = 100
-
         # Disable button during generation
         self.generate_btn.config(state='disabled')
-        self.progress_bar['value'] = 0
 
         # Run in thread to keep UI responsive
         thread = threading.Thread(target=self._generate_thread,
-                                  args=(Path(input_path), Path(output_path), bpf))
+                                  args=(Path(input_path), Path(output_path)))
         thread.daemon = True
         thread.start()
 
-    def _generate_thread(self, input_folder: Path, output_folder: Path, books_per_file: int):
+    def _generate_thread(self, input_folder: Path, output_folder: Path):
         try:
             def progress_callback(current, total, filename):
                 pct = (current / total) * 100
@@ -701,32 +782,28 @@ class Libiry2GoApp:
             # Generate
             self.root.after(0, lambda: self._update_progress(100, "Generating markdown files..."))
             field_names = load_field_names_from_libiry()
-            files = generate_markdown_files(books, output_folder, field_names, books_per_file)
+            files = generate_markdown_files(books, output_folder, field_names)
 
             # Done
-            format_name = "Obsidian" if books_per_file == 1 else "Libiry"
-            msg = f"Done! Generated {len(files)} file(s) with {len(books)} books.\n\nFormat: {format_name}\nOutput: {output_folder}"
+            msg = f"Done! Generated {len(files)} file(s) with {len(books)} books.\n\nOutput: {output_folder}"
             self.root.after(0, lambda: self._show_result(msg, success=True))
 
         except Exception as e:
             self.root.after(0, lambda: self._show_result(f"Error: {e}"))
 
     def _update_progress(self, pct: float, text: str):
-        self.progress_bar['value'] = pct
-        self.progress_label.config(text=text)
+        # Toon percentage en tekst samen (zonder grijze progress bar)
+        self.progress_label.config(text=f"[{pct:.0f}%] {text}")
 
     def _show_result(self, message: str, success: bool = False):
         self.generate_btn.config(state='normal')
-        self.progress_bar['value'] = 100 if success else 0
         self.progress_label.config(text="")
 
         if success:
-            # Lichtgroen op teal achtergrond
-            self.status_label.config(text="Catalog generated successfully!", foreground="#90EE90")
+            self.status_label.config(text="Catalog generated successfully!", foreground=self.BG_FONT_COLOR)
             messagebox.showinfo("Success", message)
         else:
-            # Licht roze/rood op teal achtergrond
-            self.status_label.config(text=message, foreground="#FFB6C1")
+            self.status_label.config(text=message, foreground=self.BG_FONT_COLOR)
             if "Error" in message:
                 messagebox.showerror("Error", message)
 
@@ -744,9 +821,8 @@ def main():
 
     Usage:
         python libiry2go.py                         # Opens GUI
-        python libiry2go.py "C:/Books"              # CLI, output next to input, 100 books/file
-        python libiry2go.py "C:/Books" "C:/Out"     # CLI, custom output, 100 books/file
-        python libiry2go.py "C:/Books" "C:/Out" 1   # CLI, one file per book (Obsidian format)
+        python libiry2go.py "C:/Books"              # CLI, output next to input
+        python libiry2go.py "C:/Books" "C:/Out"     # CLI, custom output
     """
     if len(sys.argv) > 1:
         # CLI mode
@@ -761,21 +837,10 @@ def main():
         else:
             output_folder = input_folder.parent / "Libiry2Go_Output"
 
-        # Books per file (optional 3rd argument)
-        books_per_file = MAX_BOOKS_PER_FILE
-        if len(sys.argv) > 3:
-            try:
-                books_per_file = max(1, min(100, int(sys.argv[3])))
-            except ValueError:
-                print(f"Warning: Invalid books_per_file '{sys.argv[3]}', using {MAX_BOOKS_PER_FILE}")
-
-        format_name = "Obsidian (one file per book)" if books_per_file == 1 else f"Libiry ({books_per_file} books/file)"
-
         print(f"Libiry2Go - Portable Book Catalog Generator")
         print(f"=" * 50)
         print(f"Input:  {input_folder}")
         print(f"Output: {output_folder}")
-        print(f"Format: {format_name}")
         print()
 
         # Progress callback voor CLI
@@ -793,7 +858,7 @@ def main():
 
         print(f"Found {len(books)} files. Generating markdown...")
         field_names = load_field_names_from_libiry()
-        files = generate_markdown_files(books, output_folder, field_names, books_per_file)
+        files = generate_markdown_files(books, output_folder, field_names)
 
         print(f"\nDone! Generated {len(files)} file(s):")
         for f in files[:10]:  # Toon max 10 files
