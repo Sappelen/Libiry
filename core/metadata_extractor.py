@@ -52,29 +52,87 @@ class BookMetadata:
     notes: str = ""                                  # Goodreads: Private Notes
 
 
-# Default field names - kunnen aangepast worden via customize.txt
-# Deze namen worden gebruikt bij het parsen en schrijven van markdown bestanden
-# Volgorde gebaseerd op Goodreads CSV export voor maximale compatibiliteit
-DEFAULT_FIELD_NAMES = {
-    'cover': 'cover',              # UI: cover afbeelding (niet in Goodreads)
-    'booktitle': 'booktitle',      # Goodreads: Title
-    'author': 'author',            # Goodreads: Author
-    'author_sort': 'author_sort',  # Sorteer naam auteur
-    'isbn': 'isbn',                # ISBN
-    'rating': 'rating',            # Goodreads: My Rating
-    'publisher': 'publisher',      # Goodreads: Publisher
-    'year': 'year',                # Goodreads: Year Published
-    'publication_date': 'publication_date',  # Volledige publicatiedatum
-    'language': 'language',        # Taal
-    'pages': 'pages',              # Aantal pagina's
-    'tags': 'tags',                # Goodreads: Bookshelves
-    'series': 'series',            # Serie naam
-    'series_index': 'series_index',# Serie volgnummer
-    'translator': 'translator',    # Vertaler
-    'illustrator': 'illustrator',  # Illustrator
-    'description': 'description',  # Goodreads: My Review (of boekbeschrijving)
-    'notes': 'notes',              # Goodreads: Private Notes
-}
+# Centrale imports - geen dubbele code!
+from core.libiry_style import (
+    DEFAULT_FIELD_NAMES,
+    convert_calibre_rating,
+    normalize_rating,
+)
+
+
+# =============================================================================
+# XML/OPF Namespace Constants (voor hergebruik)
+# =============================================================================
+
+DC_NS = 'http://purl.org/dc/elements/1.1/'
+OPF_NS = 'http://www.idpf.org/2007/opf'
+
+
+# =============================================================================
+# XML Helper Functions (centrale versie - geen dubbele code!)
+# =============================================================================
+
+def find_dc_text(metadata_elem, tag: str, dc_ns: str = DC_NS) -> str:
+    """Find Dublin Core text element in XML metadata.
+
+    Robuuste helper die werkt met verschillende namespace varianten.
+    Centraal gedefinieerd om duplicatie te voorkomen.
+
+    Args:
+        metadata_elem: XML element containing metadata
+        tag: DC tag name (e.g., 'title', 'creator', 'identifier')
+        dc_ns: Dublin Core namespace (default: standard DC namespace)
+
+    Returns:
+        Text content of element, or empty string if not found
+    """
+    # Probeer met volledige DC namespace (Clark notatie)
+    elem = metadata_elem.find(f'{{{dc_ns}}}{tag}')
+    if elem is not None and elem.text:
+        return elem.text.strip()
+
+    # Probeer zonder namespace
+    elem = metadata_elem.find(tag)
+    if elem is not None and elem.text:
+        return elem.text.strip()
+
+    # Zoek in alle children - check zowel }tag als :tag patronen
+    # Dit vangt namespace variaties op (bijv. {ns}tag of prefix:tag)
+    for e in metadata_elem:
+        if e.tag.endswith(f'}}{tag}') or e.tag.endswith(f':{tag}') or e.tag == tag:
+            if e.text:
+                return e.text.strip()
+
+    # Extra fallback: zoek ook in geneste elementen (sommige OPF structuren)
+    for e in metadata_elem.iter():
+        if e.tag.endswith(f'}}{tag}') or e.tag.endswith(f':{tag}') or e.tag == tag:
+            if e.text:
+                return e.text.strip()
+
+    return ''
+
+
+def find_opf_metadata_element(root, opf_ns: str = OPF_NS):
+    """Find the metadata element in an OPF XML structure.
+
+    Args:
+        root: XML root element
+        opf_ns: OPF namespace (default: standard OPF namespace)
+
+    Returns:
+        metadata element, or root if not found
+    """
+    # Zoek metadata element - probeer verschillende varianten
+    metadata_elem = root.find(f'.//{{{opf_ns}}}metadata')
+    if metadata_elem is None:
+        metadata_elem = root.find('.//metadata')
+    if metadata_elem is None:
+        # Misschien is root zelf het metadata element of package
+        if root.tag.endswith('metadata'):
+            metadata_elem = root
+        else:
+            metadata_elem = root  # Zoek in root
+    return metadata_elem
 
 
 class MetadataExtractor:
@@ -123,13 +181,28 @@ class MetadataExtractor:
             except Exception as e:
                 print(f"Failed to extract metadata from {filepath}: {e}")
 
-        # Voor onbekende bestandsformaten: check OPF sidecar voor tags
+        # Voor onbekende bestandsformaten: check sidecar voor metadata
         # Dit ondersteunt file types zoals .rtf, .mp3, .txt etc.
-        # OPF bestanden zelf worden overgeslagen (geen sidecar voor sidecar)
-        if suffix != '.opf':
+        # Sidecar bestanden zelf worden overgeslagen (geen sidecar voor sidecar)
+        if suffix not in ('.opf', '.md'):
             meta = BookMetadata(booktitle=filepath.stem)
-            # Lees tags uit OPF sidecar als die bestaat
-            meta.tags = read_opf_tags(filepath)
+            # Lees metadata uit sidecar als die bestaat
+            sidecar_meta = read_sidecar_metadata(filepath)
+            if sidecar_meta:
+                if sidecar_meta.tags:
+                    meta.tags = sidecar_meta.tags
+                if sidecar_meta.booktitle:
+                    meta.booktitle = sidecar_meta.booktitle
+                if sidecar_meta.authors:
+                    meta.authors = sidecar_meta.authors
+                # Kopieer alle andere velden
+                for field in ['author_sort', 'isbn', 'rating', 'publisher', 'year',
+                              'publication_date', 'language', 'pages', 'series',
+                              'series_index', 'translator', 'illustrator',
+                              'description', 'notes']:
+                    val = getattr(sidecar_meta, field, None)
+                    if val is not None and val != '':
+                        setattr(meta, field, val)
             return meta
 
         # Return metadata with filename as title fallback
@@ -469,12 +542,10 @@ class MetadataExtractor:
                         except (ValueError, TypeError):
                             pass
                     elif name == 'calibre:rating' and content:
-                        # Calibre gebruikt 0-10, wij tonen 0-5
-                        try:
-                            calibre_rating = float(content)
-                            meta.rating = calibre_rating / 2.0
-                        except (ValueError, TypeError):
-                            pass
+                        # Gebruik centrale conversie (met kwart-sterren)
+                        rating = convert_calibre_rating(content)
+                        if rating is not None:
+                            meta.rating = rating
                     elif name == 'calibre:user_notes' and content:
                         meta.notes = content
                     # Pages kan in verschillende Calibre custom columns zitten
@@ -499,7 +570,7 @@ class MetadataExtractor:
         1. ebookmeta - voor titel, auteur etc.
         2. mobi - als fallback voor basis metadata
 
-        Tags worden ALTIJD uit OPF sidecar file gelezen (ebookmeta is onbetrouwbaar).
+        Tags worden ALTIJD uit Markdown sidecar file gelezen (ebookmeta is onbetrouwbaar).
         """
         meta = BookMetadata(booktitle=filepath.stem)
 
@@ -551,35 +622,35 @@ class MetadataExtractor:
         except Exception:
             pass
 
-        # Tags en extra velden komen ALTIJD uit OPF sidecar file (MOBI tag support is onbetrouwbaar)
-        # OPF waarden overschrijven ebookmeta waarden zodat user edits behouden blijven
-        opf_meta = read_opf_metadata(filepath)
-        if opf_meta:
-            meta.tags = opf_meta.tags or []
-            # Basis velden: OPF heeft prioriteit over ebookmeta (user edits)
-            # BELANGRIJK: booktitle moet ook uit OPF gelezen worden anders gaan edits verloren
-            if opf_meta.booktitle:
-                meta.booktitle = opf_meta.booktitle
-            if opf_meta.authors:
-                meta.authors = opf_meta.authors
-            if opf_meta.publisher:
-                meta.publisher = opf_meta.publisher
-            if opf_meta.language:
-                meta.language = opf_meta.language
+        # Tags en extra velden komen ALTIJD uit sidecar file (MOBI tag support is onbetrouwbaar)
+        # Sidecar waarden overschrijven ebookmeta waarden zodat user edits behouden blijven
+        sidecar_meta = read_sidecar_metadata(filepath)
+        if sidecar_meta:
+            meta.tags = sidecar_meta.tags or []
+            # Basis velden: sidecar heeft prioriteit over ebookmeta (user edits)
+            # BELANGRIJK: booktitle moet ook uit sidecar gelezen worden anders gaan edits verloren
+            if sidecar_meta.booktitle:
+                meta.booktitle = sidecar_meta.booktitle
+            if sidecar_meta.authors:
+                meta.authors = sidecar_meta.authors
+            if sidecar_meta.publisher:
+                meta.publisher = sidecar_meta.publisher
+            if sidecar_meta.language:
+                meta.language = sidecar_meta.language
             # Extra velden die MOBI niet native ondersteunt
-            meta.isbn = opf_meta.isbn or meta.isbn or ''
-            meta.series = opf_meta.series or ''
-            meta.series_index = opf_meta.series_index
-            meta.rating = opf_meta.rating
-            meta.notes = opf_meta.notes or ''
-            meta.year = opf_meta.year or ''
-            meta.description = opf_meta.description or ''
+            meta.isbn = sidecar_meta.isbn or meta.isbn or ''
+            meta.series = sidecar_meta.series or ''
+            meta.series_index = sidecar_meta.series_index
+            meta.rating = sidecar_meta.rating
+            meta.notes = sidecar_meta.notes or ''
+            meta.year = sidecar_meta.year or ''
+            meta.description = sidecar_meta.description or ''
             # Nieuwe velden
-            meta.author_sort = opf_meta.author_sort or ''
-            meta.publication_date = opf_meta.publication_date or ''
-            meta.pages = opf_meta.pages or ''
-            meta.translator = opf_meta.translator or ''
-            meta.illustrator = opf_meta.illustrator or ''
+            meta.author_sort = sidecar_meta.author_sort or ''
+            meta.publication_date = sidecar_meta.publication_date or ''
+            meta.pages = sidecar_meta.pages or ''
+            meta.translator = sidecar_meta.translator or ''
+            meta.illustrator = sidecar_meta.illustrator or ''
         else:
             meta.tags = []
 
@@ -589,10 +660,10 @@ class MetadataExtractor:
         """Extract metadata from PDF file.
 
         Metadata wordt gelezen uit:
-        1. OPF sidecar file als die bestaat (voor extra velden zoals isbn, series, rating)
+        1. Markdown sidecar file als die bestaat (voor extra velden zoals isbn, series, rating)
         2. PDF native metadata (title, author, keywords/tags)
 
-        OPF sidecar heeft prioriteit voor velden die PDF niet native ondersteunt.
+        Sidecar heeft prioriteit voor velden die PDF niet native ondersteunt.
         """
         meta = BookMetadata(booktitle=filepath.stem)
 
@@ -610,22 +681,25 @@ class MetadataExtractor:
                     meta.booktitle = pdf_meta['title']
 
                 if pdf_meta.get('author'):
-                    # Split authors by common separators
+                    # Split authors by unambiguous separators only
+                    # Do NOT split on comma - "Last, First" is valid single author
                     authors_str = pdf_meta['author']
-                    for sep in [';', ',', '&', ' and ']:
+                    for sep in [';', '&', ' and ']:
                         if sep in authors_str:
                             meta.authors = [a.strip() for a in authors_str.split(sep)]
                             break
                     else:
                         meta.authors = [authors_str]
 
-                # Tags uit keywords veld
-                if pdf_meta.get('keywords'):
-                    meta.tags = [k.strip() for k in pdf_meta['keywords'].split(',') if k.strip()]
-
-                # Description uit subject veld
+                # Tags: Calibre en veel ebook tools slaan tags op in het 'subject' veld.
+                # Het 'keywords' veld bevat vaak irrelevante data zoals URLs of generator info.
+                # Daarom: subject eerst, keywords als fallback.
+                # Tags worden gescheiden door ', ' (komma-spatie) - consistent met schrijven.
                 if pdf_meta.get('subject'):
-                    meta.description = pdf_meta['subject']
+                    subject = pdf_meta['subject'].strip()
+                    meta.tags = [t.strip() for t in subject.split(', ') if t.strip()]
+                elif pdf_meta.get('keywords'):
+                    meta.tags = [pdf_meta['keywords'].strip()]
 
                 # NB: PDF 'producer' veld is voor software die PDF maakte (bijv. "Adobe Acrobat"),
                 # NIET voor de boekuitgever. Publisher komt daarom altijd uit OPF sidecar.
@@ -650,40 +724,43 @@ class MetadataExtractor:
         except Exception as e:
             print(f"PDF native metadata error: {e}")
 
-        # STAP 2: Lees OPF sidecar voor extra velden die PDF niet ondersteunt
+        # STAP 2: Lees sidecar voor extra velden die PDF niet ondersteunt
         # én als fallback voor lege native velden
-        opf_meta = read_opf_metadata(filepath)
+        sidecar_meta = read_sidecar_metadata(filepath)
 
-        if opf_meta:
-            # Velden die PDF NIET native ondersteunt - alleen uit OPF
-            # PDF native: title, author, subject (description), keywords (tags)
+        if sidecar_meta:
+            # Velden die PDF NIET native ondersteunt - alleen uit sidecar
+            # PDF native: title, author, subject (tags)
             # PDF mist: isbn, year, language, series, series_index, rating, notes, publisher,
-            #           author_sort, publication_date, pages, translator, illustrator
-            meta.isbn = opf_meta.isbn or ''
-            meta.series = opf_meta.series or ''
-            meta.series_index = opf_meta.series_index
-            meta.rating = opf_meta.rating
-            meta.notes = opf_meta.notes or ''
-            meta.year = opf_meta.year or ''
-            meta.publisher = opf_meta.publisher or ''
-            meta.language = opf_meta.language or ''
+            #           author_sort, publication_date, pages, translator, illustrator, description
+            meta.isbn = sidecar_meta.isbn or ''
+            meta.series = sidecar_meta.series or ''
+            meta.series_index = sidecar_meta.series_index
+            meta.rating = sidecar_meta.rating
+            meta.notes = sidecar_meta.notes or ''
+            meta.year = sidecar_meta.year or ''
+            meta.publisher = sidecar_meta.publisher or ''
+            meta.language = sidecar_meta.language or ''
             # Nieuwe velden
-            meta.author_sort = opf_meta.author_sort or ''
-            meta.publication_date = opf_meta.publication_date or ''
-            meta.pages = opf_meta.pages or ''
-            meta.translator = opf_meta.translator or ''
-            meta.illustrator = opf_meta.illustrator or ''
+            meta.author_sort = sidecar_meta.author_sort or ''
+            meta.publication_date = sidecar_meta.publication_date or ''
+            meta.pages = sidecar_meta.pages or ''
+            meta.translator = sidecar_meta.translator or ''
+            meta.illustrator = sidecar_meta.illustrator or ''
 
-            # Fallback naar OPF voor problematische PDFs waar native velden niet werken
+            # Fallback naar sidecar voor problematische PDFs waar native velden niet werken
             if not meta.booktitle or meta.booktitle == filepath.stem:
-                if opf_meta.booktitle:
-                    meta.booktitle = opf_meta.booktitle
-            if not meta.authors and opf_meta.authors:
-                meta.authors = opf_meta.authors
-            if not meta.description and opf_meta.description:
-                meta.description = opf_meta.description
-            if not meta.tags and opf_meta.tags:
-                meta.tags = opf_meta.tags
+                if sidecar_meta.booktitle:
+                    meta.booktitle = sidecar_meta.booktitle
+            if not meta.authors and sidecar_meta.authors:
+                meta.authors = sidecar_meta.authors
+            if not meta.description and sidecar_meta.description:
+                meta.description = sidecar_meta.description
+            # Tags: sidecar heeft PRIORITEIT boven PDF keywords.
+            # PDF keywords bevat vaak irrelevante data (URLs, generator info).
+            # Sidecar bevat door gebruiker bewerkte tags die we willen tonen.
+            if sidecar_meta.tags:
+                meta.tags = sidecar_meta.tags
 
         return meta
 
@@ -783,15 +860,15 @@ class MetadataExtractor:
                         if translator_elem is not None and translator_elem.text:
                             meta.translator = translator_elem.text
 
-                        # Extra velden uit OPF sidecar (isbn, author_sort, publication_date)
-                        opf_meta = read_opf_metadata(filepath)
-                        if opf_meta:
-                            if opf_meta.isbn:
-                                meta.isbn = opf_meta.isbn
-                            if opf_meta.author_sort:
-                                meta.author_sort = opf_meta.author_sort
-                            if opf_meta.publication_date:
-                                meta.publication_date = opf_meta.publication_date
+                        # Extra velden uit sidecar (isbn, author_sort, publication_date)
+                        sidecar_meta = read_sidecar_metadata(filepath)
+                        if sidecar_meta:
+                            if sidecar_meta.isbn:
+                                meta.isbn = sidecar_meta.isbn
+                            if sidecar_meta.author_sort:
+                                meta.author_sort = sidecar_meta.author_sort
+                            if sidecar_meta.publication_date:
+                                meta.publication_date = sidecar_meta.publication_date
 
             except Exception as e:
                 # Log exception voor debugging, maar ga door met fallbacks
@@ -830,36 +907,36 @@ class MetadataExtractor:
             except Exception:
                 pass
 
-        # Voor CBR: tags en extra velden komen uit OPF sidecar file (RAR is niet schrijfbaar)
-        # ALLE velden moeten uit OPF gelezen worden omdat RAR niet schrijfbaar is
+        # Voor CBR: tags en extra velden komen uit sidecar file (RAR is niet schrijfbaar)
+        # ALLE velden moeten uit sidecar gelezen worden omdat RAR niet schrijfbaar is
         if is_cbr:
-            opf_meta = read_opf_metadata(filepath)
-            if opf_meta:
-                meta.tags = opf_meta.tags or []
-                # Basis velden - OPF overschrijft comicbox waarden (user edits)
-                if opf_meta.booktitle:
-                    meta.booktitle = opf_meta.booktitle
-                if opf_meta.authors:
-                    meta.authors = opf_meta.authors
-                if opf_meta.publisher:
-                    meta.publisher = opf_meta.publisher
-                if opf_meta.series:
-                    meta.series = opf_meta.series
-                if opf_meta.series_index is not None:
-                    meta.series_index = opf_meta.series_index
+            sidecar_meta = read_sidecar_metadata(filepath)
+            if sidecar_meta:
+                meta.tags = sidecar_meta.tags or []
+                # Basis velden - sidecar overschrijft comicbox waarden (user edits)
+                if sidecar_meta.booktitle:
+                    meta.booktitle = sidecar_meta.booktitle
+                if sidecar_meta.authors:
+                    meta.authors = sidecar_meta.authors
+                if sidecar_meta.publisher:
+                    meta.publisher = sidecar_meta.publisher
+                if sidecar_meta.series:
+                    meta.series = sidecar_meta.series
+                if sidecar_meta.series_index is not None:
+                    meta.series_index = sidecar_meta.series_index
                 # Extra velden
-                meta.isbn = opf_meta.isbn or ''
-                meta.rating = opf_meta.rating
-                meta.notes = opf_meta.notes or ''
-                meta.year = opf_meta.year or ''
-                meta.description = opf_meta.description or ''
-                meta.language = opf_meta.language or ''
+                meta.isbn = sidecar_meta.isbn or ''
+                meta.rating = sidecar_meta.rating
+                meta.notes = sidecar_meta.notes or ''
+                meta.year = sidecar_meta.year or ''
+                meta.description = sidecar_meta.description or ''
+                meta.language = sidecar_meta.language or ''
                 # Nieuwe velden
-                meta.author_sort = opf_meta.author_sort or ''
-                meta.publication_date = opf_meta.publication_date or ''
-                meta.pages = opf_meta.pages or ''
-                meta.translator = opf_meta.translator or ''
-                meta.illustrator = opf_meta.illustrator or ''
+                meta.author_sort = sidecar_meta.author_sort or ''
+                meta.publication_date = sidecar_meta.publication_date or ''
+                meta.pages = sidecar_meta.pages or ''
+                meta.translator = sidecar_meta.translator or ''
+                meta.illustrator = sidecar_meta.illustrator or ''
 
         return meta
 
@@ -976,9 +1053,10 @@ class MetadataExtractor:
         # Extract author(s)
         author = find_field(author_field)
         if author:
-            # Handle multiple authors (comma or semicolon separated)
-            if ',' in author or ';' in author:
-                meta.authors = [a.strip() for a in re.split(r'[,;]', author)]
+            # Don't split on comma - "Last, First" is a valid single author name
+            # Only split on semicolon which is unambiguous separator
+            if ';' in author:
+                meta.authors = [a.strip() for a in author.split(';')]
             else:
                 meta.authors = [author]
 
@@ -1180,35 +1258,744 @@ class MetadataExtractor:
 
 
 # =============================================================================
-# OPF Sidecar File Helpers
+# Markdown Sidecar File Helpers
 # =============================================================================
-# OPF (Open Packaging Format) sidecar files worden gebruikt als fallback voor
-# bestandsformaten waar tags niet direct in het bestand kunnen worden opgeslagen:
+# Markdown sidecar files worden gebruikt voor metadata opslag bij bestands-
+# formaten waar metadata niet direct in het bestand kan worden opgeslagen:
 # - CBR (RAR formaat, niet schrijfbaar)
 # - MOBI/AZW/AZW3 (ebookmeta library is onbetrouwbaar)
 # - Problematische PDFs (sommige PDFs ondersteunen geen metadata wijzigingen)
 #
-# De OPF file heeft dezelfde naam als het ebook maar met .opf extensie.
-# Bijvoorbeeld: book.cbr -> book.opf
+# De sidecar file heeft dezelfde naam als het ebook maar met .md extensie.
+# Bijvoorbeeld: book.cbr -> book.cbr.md
+#
+# Structuur: YAML frontmatter met alle metadata velden.
+# Tags met komma's worden gequote in de file maar quotes verborgen in UI.
 # =============================================================================
 
-def get_opf_path(ebook_path: Path) -> Path:
-    """Geef het pad naar de OPF sidecar file voor een ebook.
+def find_cover_for_ebook(ebook_path: Path) -> Optional[str]:
+    """Find the cover file for an ebook and return its filename.
+
+    Looks for cover files in the same folder as the ebook with the pattern:
+    {ebook_name}.{cover_ext} (e.g., book.pdf.jpg, book.epub.png)
+
+    Args:
+        ebook_path: Path to the ebook file
+
+    Returns:
+        Cover filename (e.g., "book.pdf.png") if found, None otherwise
+    """
+    cover_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
+    folder = ebook_path.parent
+    ebook_name = ebook_path.name
+
+    # Look for cover with pattern: book.pdf.jpg, book.pdf.png, etc.
+    for ext in cover_extensions:
+        cover_name = ebook_name + ext
+        cover_path = folder / cover_name
+        if cover_path.exists():
+            return cover_name
+
+    return None
+
+
+def consolidate_metadata_to_sidecar(ebook_path: Path,
+                                     source_metadata: dict = None,
+                                     filter_redundant: bool = True) -> dict:
+    """Consolidate metadata from various sources for writing to MD sidecar.
+
+    This is the central function for merging metadata from:
+    - Source sidecar (OPF for Calibre2Libiry, existing MD for Libiry2Go)
+    - Native ebook metadata (from the book file itself)
+
+    Priority (native overrides source where both have values):
+    1. Start with source_metadata as base (preserves user's notes, custom tags, etc.)
+    2. Override with native ebook metadata where native has values
+
+    Also sets the cover field to the cover filename if a cover exists next to
+    the ebook (e.g., book.pdf.png). This allows Obsidian to display the cover.
+
+    Used by:
+    - Calibre2Libiry: source_metadata from read_calibre_opf()
+    - Libiry2Go: source_metadata from read_sidecar_metadata()
+
+    Args:
+        ebook_path: Path to the ebook file
+        source_metadata: Optional dict with metadata from source (OPF or existing MD)
+        filter_redundant: If True, remove values that match native (e.g., same language)
+
+    Returns:
+        Merged metadata dict ready for write_sidecar_metadata()
+    """
+    from core.libiry_style import languages_equivalent
+
+    # Start with source metadata as base (or empty dict)
+    result = dict(source_metadata) if source_metadata else {}
+
+    # Check if cover file exists next to ebook and set cover field
+    cover_filename = find_cover_for_ebook(ebook_path)
+    if cover_filename:
+        result['cover'] = cover_filename
+
+    # Extract native metadata from the ebook
+    try:
+        extractor = MetadataExtractor()
+        native = extractor.extract(ebook_path)
+    except Exception:
+        # If extraction fails, return source metadata as-is
+        return result
+
+    # Fields where native should override source when native has a value
+    # These are "authoritative" fields from the book itself
+    override_fields = [
+        ('booktitle', native.booktitle),
+        ('author', ', '.join(native.authors) if native.authors else ''),
+        ('isbn', native.isbn),
+        ('publisher', native.publisher),
+        ('language', native.language),
+        ('year', native.year),
+        ('description', native.description),
+        ('series', native.series),
+        ('series_index', native.series_index),
+        ('pages', native.pages),
+    ]
+
+    for field, native_value in override_fields:
+        if native_value:  # Native has a value
+            if field == 'language':
+                from core.libiry_style import is_undefined_language
+
+                # Special handling for language:
+                # - UND (undefined) should NOT override a real language from sidecar
+                # - Real languages should override, unless equivalent (then remove redundant)
+                source_lang = result.get('language', '')
+
+                if is_undefined_language(native_value):
+                    # Native is UND - keep sidecar language if it has one
+                    # Don't override with UND
+                    continue
+
+                if filter_redundant and source_lang and languages_equivalent(source_lang, native_value):
+                    # Languages are equivalent - remove redundant sidecar value
+                    result.pop('language', None)
+                    continue
+
+                # Native has real language - use it
+                result[field] = native_value
+
+            elif field == 'author':
+                from core.libiry_style import authors_equivalent
+
+                # Special handling for author:
+                # "Niccolò Machiavelli" and "Machiavelli, Niccolò" are equivalent
+                source_author = result.get('author', '')
+
+                if filter_redundant and source_author and authors_equivalent(source_author, native_value):
+                    # Authors are equivalent - remove redundant sidecar value
+                    result.pop('author', None)
+                    continue
+
+                # Native author overrides
+                result[field] = native_value
+            else:
+                # Normal field - native overrides source
+                result[field] = native_value
+
+    # Tags: merge native tags with source tags (no duplicates)
+    if native.tags:
+        source_tags = result.get('tags', [])
+        if isinstance(source_tags, str):
+            source_tags = [t.strip() for t in source_tags.split(',') if t.strip()]
+        # Merge: source tags + native tags (deduplicated, preserve order)
+        merged_tags = list(source_tags)
+        for tag in native.tags:
+            if tag not in merged_tags:
+                merged_tags.append(tag)
+        if merged_tags:
+            result['tags'] = merged_tags
+
+    return result
+
+
+def get_sidecar_path(ebook_path: Path) -> Path:
+    """Get the path to the Markdown sidecar file for an ebook.
 
     Args:
         ebook_path: Path naar het ebook bestand
 
     Returns:
-        Path naar de corresponderende OPF file (originele naam + .opf extensie)
-        Bijv: book.mobi -> book.mobi.opf
+        Path naar de corresponderende sidecar file (originele naam + .md extensie)
+        Bijv: book.mobi -> book.mobi.md
         Dit voorkomt conflicten als je book.pdf en book.mobi in dezelfde folder hebt.
     """
-    # Voeg .opf toe aan de volledige bestandsnaam (niet vervangen)
-    # book.mobi -> book.mobi.opf (niet book.opf)
-    return ebook_path.parent / (ebook_path.name + '.opf')
+    # Voeg .md toe aan de volledige bestandsnaam (niet vervangen)
+    # book.mobi -> book.mobi.md (niet book.md)
+    return ebook_path.parent / (ebook_path.name + '.md')
 
+
+def read_sidecar_as_dict(ebook_path: Path) -> Optional[dict]:
+    """Read sidecar YAML frontmatter as a plain dict.
+
+    Unlike read_sidecar_metadata() which returns BookMetadata, this returns
+    a raw dict suitable for use with consolidate_metadata_to_sidecar().
+
+    Args:
+        ebook_path: Path to the ebook file (not the sidecar itself)
+
+    Returns:
+        Dict with metadata from sidecar, or None if sidecar doesn't exist
+    """
+    sidecar_path = get_sidecar_path(ebook_path)
+    if not sidecar_path.exists():
+        return None
+
+    try:
+        content = sidecar_path.read_text(encoding='utf-8')
+        content = content.replace('\r\n', '\n').replace('\r', '\n')
+
+        # Check for YAML frontmatter (between --- and ---)
+        yaml_match = re.match(r'^---[ \t]*\n(.*?)\n---', content, re.DOTALL)
+        if not yaml_match:
+            return None
+
+        yaml_content = yaml_match.group(1)
+        result = {}
+
+        # Helper to find YAML field value
+        # Supports single-line values and multi-line values (with or without |)
+        def find_field(field_name: str) -> str:
+            # First try multi-line: field: followed by indented lines
+            # This works with or without the | character
+            pattern_multi = rf'^{re.escape(field_name)}:\s*[|>]?\s*\n((?:[ \t]+.+\n?)+)'
+            match_multi = re.search(pattern_multi, yaml_content, re.MULTILINE | re.IGNORECASE)
+            if match_multi:
+                lines = match_multi.group(1).split('\n')
+                min_indent = float('inf')
+                for line in lines:
+                    if line.strip():
+                        indent = len(line) - len(line.lstrip())
+                        min_indent = min(min_indent, indent)
+                if min_indent == float('inf'):
+                    min_indent = 0
+                cleaned_lines = []
+                for line in lines:
+                    if len(line) >= min_indent:
+                        cleaned_lines.append(line[int(min_indent):])
+                    else:
+                        cleaned_lines.append(line.lstrip())
+                return '\n'.join(cleaned_lines).strip()
+
+            # Fallback: try single-line (field: value on same line)
+            pattern = rf'^{re.escape(field_name)}:\s*(.+?)$'
+            match = re.search(pattern, yaml_content, re.MULTILINE | re.IGNORECASE)
+            if match:
+                value = match.group(1).strip()
+                # Remove surrounding quotes
+                if (value.startswith('"') and value.endswith('"')) or \
+                   (value.startswith("'") and value.endswith("'")):
+                    value = value[1:-1]
+                return value
+
+            return ''
+
+        # Parse all metadata fields
+        for field in ['booktitle', 'author', 'author_sort', 'isbn', 'rating',
+                      'publisher', 'year', 'publication_date', 'language',
+                      'pages', 'series', 'series_index', 'translator',
+                      'illustrator', 'description', 'notes', 'cover']:
+            value = find_field(field)
+            if value:
+                result[field] = value
+
+        # Parse tags (can be YAML list or comma-separated)
+        tags_str = find_field('tags')
+        if tags_str:
+            if tags_str.startswith('[') and tags_str.endswith(']'):
+                # YAML array
+                tags = [t.strip().strip('"\'') for t in tags_str[1:-1].split(',')]
+                result['tags'] = [t for t in tags if t]
+            else:
+                # Comma-separated
+                tags = [t.strip().strip('"\'') for t in tags_str.split(',')]
+                result['tags'] = [t for t in tags if t]
+
+        return result if result else None
+
+    except Exception:
+        return None
+
+
+# Backwards compatibility alias - wordt in toekomstige versie verwijderd
+def get_opf_path(ebook_path: Path) -> Path:
+    """DEPRECATED: Gebruik get_sidecar_path() in plaats hiervan."""
+    return get_sidecar_path(ebook_path)
+
+
+def _format_tags_for_yaml(tags: List[str]) -> List[str]:
+    """Formatteer tags voor YAML output als list format (Obsidian-compatibel).
+
+    Returns een lijst van geformatteerde regels voor YAML block list format:
+        tags:
+          - fiction
+          - sci-fi
+
+    Tags die speciale YAML karakters bevatten worden gequote.
+    Dit format is compatible met Obsidian en andere YAML parsers.
+
+    Voorbeelden:
+        ['fiction', 'sci-fi'] -> ['tags:', '  - fiction', '  - sci-fi']
+        ['fiction', 'Brando, Marlon'] -> ['tags:', '  - fiction', '  - "Brando, Marlon"']
+    """
+    if not tags:
+        return []
+
+    lines = ['tags:']
+    for tag in tags:
+        # Tags met speciale YAML karakters worden gequote
+        # Speciale karakters: komma, dubbele punt, haakjes, etc.
+        if any(c in tag for c in ':#[]{}|>&*!,'):
+            # Escape eventuele quotes in de tag
+            escaped = tag.replace('"', '\\"')
+            lines.append(f'  - "{escaped}"')
+        else:
+            lines.append(f'  - {tag}')
+
+    return lines
+
+
+def _parse_tags_from_yaml(tags_str: str) -> List[str]:
+    """Parse tags uit YAML string.
+
+    Ondersteunt:
+    - YAML block list: "  - fiction\\n  - sci-fi" (Obsidian-compatibel)
+    - Komma-gescheiden: fiction, sci-fi
+    - Gequote tags: fiction, "Brando, Marlon", sci-fi
+    - YAML array: [fiction, sci-fi]
+
+    Quotes worden verwijderd uit de output.
+    """
+    if not tags_str:
+        return []
+
+    tags_str = tags_str.strip()
+
+    # Format 1: YAML block list met "- item" syntax (Obsidian-compatibel)
+    # Dit is het primaire format dat we nu schrijven
+    if '\n' in tags_str or tags_str.startswith('-'):
+        tags = []
+        for line in tags_str.split('\n'):
+            line = line.strip()
+            if line.startswith('-'):
+                # Verwijder de "- " prefix
+                tag = line[1:].strip()
+                # Verwijder quotes indien aanwezig
+                if (tag.startswith('"') and tag.endswith('"')) or \
+                   (tag.startswith("'") and tag.endswith("'")):
+                    tag = tag[1:-1]
+                # Unescape quotes
+                tag = tag.replace('\\"', '"').replace("\\'", "'")
+                if tag:
+                    tags.append(tag)
+        if tags:
+            return tags
+
+    # Format 2: YAML array formaat: [tag1, tag2]
+    if tags_str.startswith('[') and tags_str.endswith(']'):
+        tags_str = tags_str[1:-1]
+
+    # Format 3: Komma-gescheiden (inclusief gequote tags)
+    tags = []
+    current = ''
+    in_quotes = False
+    quote_char = None
+    i = 0
+
+    while i < len(tags_str):
+        char = tags_str[i]
+
+        if char in ('"', "'") and not in_quotes:
+            # Start van quoted string
+            in_quotes = True
+            quote_char = char
+        elif char == quote_char and in_quotes:
+            # Eind van quoted string (check voor escaped quote)
+            if i > 0 and tags_str[i-1] == '\\':
+                # Escaped quote - voeg toe aan current
+                current = current[:-1] + char  # Verwijder backslash, voeg quote toe
+            else:
+                in_quotes = False
+                quote_char = None
+        elif char == ',' and not in_quotes:
+            # Separator gevonden
+            tag = current.strip()
+            if tag:
+                tags.append(tag)
+            current = ''
+        else:
+            current += char
+
+        i += 1
+
+    # Laatste tag
+    tag = current.strip()
+    if tag:
+        tags.append(tag)
+
+    return tags
+
+
+def read_sidecar_metadata(ebook_path: Path) -> Optional[BookMetadata]:
+    """Lees alle metadata uit een Markdown sidecar file (YAML frontmatter).
+
+    Leest: booktitle, author, isbn, publisher, language, description, year,
+    tags, series, series_index, rating, notes, author_sort, publication_date,
+    pages, translator, illustrator.
+
+    Args:
+        ebook_path: Path naar het ebook bestand (niet de sidecar zelf)
+
+    Returns:
+        BookMetadata object met alle gevonden velden, of None als sidecar niet bestaat
+    """
+    sidecar_path = get_sidecar_path(ebook_path)
+    if not sidecar_path.exists():
+        return None
+
+    try:
+        content = sidecar_path.read_text(encoding='utf-8')
+        content = content.replace('\r\n', '\n').replace('\r', '\n')
+
+        # Check for YAML frontmatter (tussen --- en ---)
+        yaml_match = re.match(r'^---[ \t]*\n(.*?)\n---', content, re.DOTALL)
+        if not yaml_match:
+            return None
+
+        yaml_content = yaml_match.group(1)
+        meta = BookMetadata()
+
+        # Helper to find YAML field value
+        # Supports single-line values and multi-line values (with or without |)
+        def find_field(field_name: str) -> str:
+            # First try multi-line: field: followed by indented lines
+            # This works with or without the | character
+            # Pattern: field: [optional | or >] newline, then indented content
+            pattern_multi = rf'^{re.escape(field_name)}:\s*[|>]?\s*\n((?:[ \t]+.+\n?)+)'
+            match_multi = re.search(pattern_multi, yaml_content, re.MULTILINE | re.IGNORECASE)
+            if match_multi:
+                # Remove indentation from each line
+                lines = match_multi.group(1).split('\n')
+                # Determine minimum indentation
+                min_indent = float('inf')
+                for line in lines:
+                    if line.strip():
+                        indent = len(line) - len(line.lstrip())
+                        min_indent = min(min_indent, indent)
+                if min_indent == float('inf'):
+                    min_indent = 0
+                # Remove minimum indentation from each line
+                cleaned_lines = []
+                for line in lines:
+                    if len(line) >= min_indent:
+                        cleaned_lines.append(line[int(min_indent):])
+                    else:
+                        cleaned_lines.append(line.lstrip())
+                return '\n'.join(cleaned_lines).strip()
+
+            # Fallback: try single-line (field: value on same line)
+            pattern = rf'^{re.escape(field_name)}:\s*(.+?)$'
+            match = re.search(pattern, yaml_content, re.MULTILINE | re.IGNORECASE)
+            if match:
+                value = match.group(1).strip()
+                # Remove surrounding quotes
+                if (value.startswith('"') and value.endswith('"')) or \
+                   (value.startswith("'") and value.endswith("'")):
+                    value = value[1:-1]
+                return value
+
+            return ''
+
+        # Parse velden
+        meta.booktitle = find_field('booktitle')
+
+        # Author kan string of lijst zijn
+        author_str = find_field('author')
+        if author_str:
+            # Check if it's a YAML array format
+            if author_str.startswith('[') and author_str.endswith(']'):
+                # YAML array: [Author One, Author Two] or ["Last, First", "Other Author"]
+                # Split on comma but respect quotes
+                authors = []
+                inner = author_str[1:-1]
+                # Simple quoted string handling
+                parts = []
+                current = ''
+                in_quotes = False
+                quote_char = None
+                for char in inner:
+                    if char in ('"', "'") and not in_quotes:
+                        in_quotes = True
+                        quote_char = char
+                    elif char == quote_char and in_quotes:
+                        in_quotes = False
+                        quote_char = None
+                    elif char == ',' and not in_quotes:
+                        parts.append(current.strip().strip('"\''))
+                        current = ''
+                        continue
+                    current += char
+                if current.strip():
+                    parts.append(current.strip().strip('"\''))
+                meta.authors = [a for a in parts if a]
+            else:
+                # Single author string - do NOT split on comma
+                # because "Last, First" is a valid single author name
+                # Multiple authors should use YAML array format
+                meta.authors = [author_str]
+
+        meta.author_sort = find_field('author_sort')
+        meta.isbn = find_field('isbn')
+        meta.publisher = find_field('publisher')
+        meta.language = find_field('language')
+        meta.year = find_field('year')
+        meta.publication_date = find_field('publication_date')
+        meta.pages = find_field('pages')
+        meta.series = find_field('series')
+        meta.translator = find_field('translator')
+        meta.illustrator = find_field('illustrator')
+        meta.description = find_field('description')
+        meta.notes = find_field('notes')
+
+        # Series index
+        series_index_str = find_field('series_index')
+        if series_index_str:
+            try:
+                meta.series_index = float(series_index_str)
+            except (ValueError, TypeError):
+                pass
+
+        # Rating
+        rating_str = find_field('rating')
+        if rating_str:
+            try:
+                meta.rating = float(rating_str)
+            except (ValueError, TypeError):
+                pass
+
+        # Tags - ondersteun zowel YAML array als komma-gescheiden string
+        tags_str = find_field('tags')
+        if tags_str:
+            meta.tags = _parse_tags_from_yaml(tags_str)
+
+        return meta
+
+    except Exception as e:
+        print(f"Error reading sidecar metadata from {sidecar_path}: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def write_sidecar_metadata(sidecar_path: Path, metadata: dict) -> bool:
+    """Schrijf volledige metadata naar een Markdown sidecar file (YAML frontmatter).
+
+    Maakt een nieuwe sidecar file aan of update een bestaande.
+    Ondersteunt alle metadata velden: booktitle, author, isbn, tags,
+    rating, publisher, year, language, series, series_index, description, notes,
+    author_sort, publication_date, pages, translator, illustrator.
+
+    Args:
+        sidecar_path: Path naar de sidecar file (direct, niet het ebook)
+        metadata: Dict met metadata velden
+
+    Returns:
+        True als succesvol, False bij fout
+    """
+    try:
+        lines = ['---']
+
+        # Volgorde van velden (gebaseerd op plan)
+        # Single-line velden
+        single_fields = [
+            ('booktitle', 'booktitle'),
+            ('author', 'author'),
+            ('author_sort', 'author_sort'),
+            ('isbn', 'isbn'),
+            ('rating', 'rating'),
+            ('publisher', 'publisher'),
+            ('year', 'year'),
+            ('publication_date', 'publication_date'),
+            ('language', 'language'),
+            ('pages', 'pages'),
+            ('series', 'series'),
+            ('series_index', 'series_index'),
+            ('translator', 'translator'),
+            ('illustrator', 'illustrator'),
+            ('cover', 'cover'),
+        ]
+
+        for meta_key, yaml_key in single_fields:
+            if meta_key in metadata and metadata[meta_key]:
+                value = metadata[meta_key]
+                # Strings met speciale karakters quoten
+                if isinstance(value, str) and any(c in value for c in ':#[]{}|>&*!'):
+                    value = f'"{value}"'
+                lines.append(f'{yaml_key}: {value}')
+
+        # Tags als YAML block list (Obsidian-compatibel format)
+        if 'tags' in metadata and metadata['tags']:
+            tags = metadata['tags']
+            if isinstance(tags, list):
+                tag_lines = _format_tags_for_yaml(tags)
+                lines.extend(tag_lines)
+            elif tags:
+                # String: converteer naar list en formatteer
+                tag_list = [t.strip() for t in str(tags).split(',') if t.strip()]
+                if tag_list:
+                    tag_lines = _format_tags_for_yaml(tag_list)
+                    lines.extend(tag_lines)
+
+        # Multi-line fields (description, notes)
+        # Written without YAML | operator for cleaner human-readable format
+        # Our read functions handle both formats (with or without |)
+        for field in ['description', 'notes']:
+            if field in metadata and metadata[field]:
+                value = str(metadata[field])
+                if '\n' in value:
+                    # Multi-line: just indent continuation lines (no | needed)
+                    lines.append(f'{field}:')
+                    for line in value.split('\n'):
+                        lines.append(f'  {line}')
+                else:
+                    # Single line
+                    if any(c in value for c in ':#[]{}|>&*!'):
+                        value = f'"{value}"'
+                    lines.append(f'{field}: {value}')
+
+        lines.append('---')
+        lines.append('')  # Lege regel na frontmatter
+
+        # Schrijf naar bestand
+        sidecar_path.write_text('\n'.join(lines), encoding='utf-8')
+        return True
+
+    except Exception as e:
+        print(f"Error writing sidecar metadata to {sidecar_path}: {e}")
+        return False
+
+
+def modify_sidecar_tags(ebook_path: Path, tags_to_remove: set, tags_to_add: set) -> bool:
+    """Wijzig tags in een Markdown sidecar file.
+
+    Ondersteunt meerdere tags tegelijk toevoegen of verwijderen.
+
+    Args:
+        ebook_path: Path naar het ebook bestand
+        tags_to_remove: Set van tags om te verwijderen (case-sensitive)
+        tags_to_add: Set van tags om toe te voegen (case-sensitive)
+
+    Returns:
+        True als wijzigingen gemaakt zijn, False anders
+    """
+    # Lees huidige metadata
+    current_meta = read_sidecar_metadata(ebook_path)
+    current_tags = current_meta.tags if current_meta else []
+
+    # Pas tags aan - verwijder tags (case-sensitive)
+    new_tags = [t for t in current_tags if t not in tags_to_remove]
+    removed_count = len(current_tags) - len(new_tags)
+
+    # Voeg alle nieuwe tags toe die er nog niet zijn (case-sensitive)
+    tags_added = []
+    for tag_to_add in sorted(tags_to_add):  # Sorteer voor consistente volgorde
+        if tag_to_add not in new_tags:
+            new_tags.append(tag_to_add)
+            tags_added.append(tag_to_add)
+
+    # Check of er wijzigingen zijn
+    if removed_count == 0 and not tags_added:
+        return False
+
+    # Bouw nieuwe metadata - behoud bestaande velden
+    sidecar_path = get_sidecar_path(ebook_path)
+
+    new_metadata = {}
+    if current_meta:
+        # Kopieer alle niet-lege velden
+        if current_meta.booktitle:
+            new_metadata['booktitle'] = current_meta.booktitle
+        if current_meta.authors:
+            new_metadata['author'] = ', '.join(current_meta.authors)
+        if current_meta.author_sort:
+            new_metadata['author_sort'] = current_meta.author_sort
+        if current_meta.isbn:
+            new_metadata['isbn'] = current_meta.isbn
+        if current_meta.rating is not None:
+            new_metadata['rating'] = current_meta.rating
+        if current_meta.publisher:
+            new_metadata['publisher'] = current_meta.publisher
+        if current_meta.year:
+            new_metadata['year'] = current_meta.year
+        if current_meta.publication_date:
+            new_metadata['publication_date'] = current_meta.publication_date
+        if current_meta.language:
+            new_metadata['language'] = current_meta.language
+        if current_meta.pages:
+            new_metadata['pages'] = current_meta.pages
+        if current_meta.series:
+            new_metadata['series'] = current_meta.series
+        if current_meta.series_index is not None:
+            new_metadata['series_index'] = current_meta.series_index
+        if current_meta.translator:
+            new_metadata['translator'] = current_meta.translator
+        if current_meta.illustrator:
+            new_metadata['illustrator'] = current_meta.illustrator
+        if current_meta.description:
+            new_metadata['description'] = current_meta.description
+        if current_meta.notes:
+            new_metadata['notes'] = current_meta.notes
+
+    # Update tags
+    new_metadata['tags'] = new_tags
+
+    # Schrijf naar sidecar
+    return write_sidecar_metadata(sidecar_path, new_metadata)
+
+
+# =============================================================================
+# Backwards Compatibility Aliases
+# =============================================================================
+# Deze functies roepen de nieuwe sidecar functies aan voor backward compatibility.
+# Ze worden in een toekomstige versie verwijderd.
+# =============================================================================
 
 def read_opf_metadata(ebook_path: Path) -> Optional[BookMetadata]:
+    """DEPRECATED: Gebruik read_sidecar_metadata() in plaats hiervan."""
+    return read_sidecar_metadata(ebook_path)
+
+
+def write_opf_metadata(sidecar_path: Path, metadata: dict) -> bool:
+    """DEPRECATED: Gebruik write_sidecar_metadata() in plaats hiervan."""
+    return write_sidecar_metadata(sidecar_path, metadata)
+
+
+def modify_opf_tags(ebook_path: Path, tags_to_remove: set, tags_to_add: set) -> bool:
+    """DEPRECATED: Gebruik modify_sidecar_tags() in plaats hiervan."""
+    return modify_sidecar_tags(ebook_path, tags_to_remove, tags_to_add)
+
+
+# =============================================================================
+# VERWIJDERDE FUNCTIES (niet meer nodig met nieuwe sidecar structuur)
+# =============================================================================
+# read_opf_tags() en write_opf_tags() zijn verwijderd.
+# Gebruik read_sidecar_metadata() en write_sidecar_metadata() met 'tags' veld.
+# =============================================================================
+
+
+# =============================================================================
+# Legacy OPF Reading Support (voor Calibre2Libiry conversie)
+# =============================================================================
+
+def read_legacy_opf_metadata(ebook_path: Path) -> Optional[BookMetadata]:
     """Lees alle metadata uit een OPF sidecar file.
 
     Leest: booktitle, author, isbn, publisher, language, description, year,
@@ -1352,10 +2139,10 @@ def read_opf_metadata(ebook_path: Path) -> Optional[BookMetadata]:
                 except (ValueError, TypeError):
                     pass
             elif name == 'calibre:rating' and content:
-                try:
-                    meta.rating = float(content) / 2.0  # Calibre 0-10 -> 0-5
-                except (ValueError, TypeError):
-                    pass
+                # Gebruik centrale conversie (met kwart-sterren)
+                rating = convert_calibre_rating(content)
+                if rating is not None:
+                    meta.rating = rating
             elif name == 'calibre:user_notes' and content:
                 meta.notes = content
             # Pages kan in verschillende meta elementen zitten
@@ -1392,293 +2179,7 @@ def read_opf_metadata(ebook_path: Path) -> Optional[BookMetadata]:
         return meta
 
     except Exception as e:
-        print(f"Error reading OPF metadata from {opf_path}: {e}")
+        print(f"Error reading legacy OPF metadata from {opf_path}: {e}")
         import traceback
         traceback.print_exc()
         return None
-
-
-def read_opf_tags(ebook_path: Path) -> List[str]:
-    """Lees tags uit een OPF sidecar file.
-
-    Args:
-        ebook_path: Path naar het ebook bestand (niet de OPF zelf)
-
-    Returns:
-        Lijst met tags, of lege lijst als OPF niet bestaat/leesbaar is
-    """
-    import xml.etree.ElementTree as ET
-
-    opf_path = get_opf_path(ebook_path)
-    if not opf_path.exists():
-        return []
-
-    try:
-        tree = ET.parse(opf_path)
-        root = tree.getroot()
-
-        # OPF namespace
-        ns = {
-            'opf': 'http://www.idpf.org/2007/opf',
-            'dc': 'http://purl.org/dc/elements/1.1/'
-        }
-
-        tags = []
-
-        # Zoek dc:subject elementen (met namespace)
-        for subject in root.findall('.//dc:subject', ns):
-            if subject.text:
-                tags.append(subject.text.strip())
-
-        # Fallback: zoek zonder namespace (sommige OPF files)
-        if not tags:
-            for subject in root.iter():
-                if subject.tag.endswith('subject') and subject.text:
-                    tags.append(subject.text.strip())
-
-        return tags
-
-    except Exception:
-        return []
-
-
-def write_opf_tags(ebook_path: Path, tags: List[str]) -> bool:
-    """Schrijf tags naar een OPF sidecar file.
-
-    Maakt een nieuwe OPF file aan of update een bestaande.
-    Als tags leeg is en OPF bestaat, wordt de OPF verwijderd.
-
-    Args:
-        ebook_path: Path naar het ebook bestand (niet de OPF zelf)
-        tags: Lijst met tags om op te slaan
-
-    Returns:
-        True als succesvol, False bij fout
-    """
-    import xml.etree.ElementTree as ET
-
-    opf_path = get_opf_path(ebook_path)
-
-    # Als geen tags en OPF bestaat, verwijder de OPF
-    if not tags:
-        if opf_path.exists():
-            try:
-                opf_path.unlink()
-            except Exception:
-                pass
-        return True
-
-    try:
-        # Maak OPF XML structuur
-        # Registreer namespaces om mooie output te krijgen
-        ET.register_namespace('', 'http://www.idpf.org/2007/opf')
-        ET.register_namespace('dc', 'http://purl.org/dc/elements/1.1/')
-
-        root = ET.Element('{http://www.idpf.org/2007/opf}package')
-        root.set('version', '2.0')
-
-        metadata = ET.SubElement(root, '{http://www.idpf.org/2007/opf}metadata')
-
-        # Voeg dc:subject elementen toe voor elke tag
-        for tag in tags:
-            subject = ET.SubElement(metadata, '{http://purl.org/dc/elements/1.1/}subject')
-            subject.text = tag
-
-        # Schrijf naar bestand
-        tree = ET.ElementTree(root)
-
-        # Python 3.8+ ondersteunt xml_declaration in write()
-        with open(opf_path, 'wb') as f:
-            tree.write(f, encoding='UTF-8', xml_declaration=True)
-
-        return True
-
-    except Exception as e:
-        print(f"Error writing OPF file {opf_path}: {e}")
-        return False
-
-
-def write_opf_metadata(opf_path: Path, metadata: dict) -> bool:
-    """Schrijf volledige metadata naar een OPF sidecar file.
-
-    Maakt een nieuwe OPF file aan of update een bestaande.
-    Ondersteunt alle metadata velden: booktitle, author, isbn, tags,
-    rating, publisher, year, language, series, series_index, description, notes,
-    author_sort, publication_date, pages, translator, illustrator.
-
-    Args:
-        opf_path: Path naar de OPF file (direct, niet het ebook)
-        metadata: Dict met metadata velden
-
-    Returns:
-        True als succesvol, False bij fout
-    """
-    import xml.etree.ElementTree as ET
-
-    DC_NS = 'http://purl.org/dc/elements/1.1/'
-    OPF_NS = 'http://www.idpf.org/2007/opf'
-
-    try:
-        # Registreer namespaces
-        # Let op: 'opf' prefix is nodig voor attributes zoals opf:role en opf:file-as
-        # Zonder deze registratie genereert ElementTree een willekeurige prefix (ns0, ns1)
-        # wat het lezen van de attributen kan verstoren
-        ET.register_namespace('', OPF_NS)
-        ET.register_namespace('dc', DC_NS)
-        ET.register_namespace('opf', OPF_NS)
-
-        # Maak OPF structuur
-        root = ET.Element(f'{{{OPF_NS}}}package')
-        root.set('version', '2.0')
-
-        meta_elem = ET.SubElement(root, f'{{{OPF_NS}}}metadata')
-
-        # Mapping van metadata keys naar DC elementen
-        # Let op: year wordt NIET via dc:date opgeslagen omdat publication_date
-        # die waarde zou overschrijven. Year krijgt een apart meta element.
-        dc_mapping = {
-            'booktitle': 'title',
-            'author': 'creator',
-            'isbn': 'identifier',
-            'publisher': 'publisher',
-            'language': 'language',
-            'description': 'description',
-            # 'year' verwijderd - wordt apart opgeslagen als meta element
-        }
-
-        # Voeg DC elementen toe
-        for key, dc_name in dc_mapping.items():
-            if key in metadata and metadata[key]:
-                elem = ET.SubElement(meta_elem, f'{{{DC_NS}}}{dc_name}')
-                elem.text = str(metadata[key])
-
-        # Tags als dc:subject
-        if 'tags' in metadata and metadata['tags']:
-            for tag in metadata['tags']:
-                if tag:
-                    subject = ET.SubElement(meta_elem, f'{{{DC_NS}}}subject')
-                    subject.text = tag
-
-        # Extra velden als meta elementen (Calibre-compatibel)
-        # Series, series_index, rating gebruiken calibre: prefix
-        if 'series' in metadata and metadata['series']:
-            meta = ET.SubElement(meta_elem, 'meta')
-            meta.set('name', 'calibre:series')
-            meta.set('content', str(metadata['series']))
-
-        if 'series_index' in metadata and metadata['series_index']:
-            meta = ET.SubElement(meta_elem, 'meta')
-            meta.set('name', 'calibre:series_index')
-            meta.set('content', str(metadata['series_index']))
-
-        if 'rating' in metadata and metadata['rating']:
-            meta = ET.SubElement(meta_elem, 'meta')
-            meta.set('name', 'calibre:rating')
-            # Converteer van 0-5 naar 0-10 (Calibre schaal)
-            try:
-                rating_val = float(metadata['rating'])
-                calibre_rating = int(rating_val * 2)
-                meta.set('content', str(calibre_rating))
-            except (ValueError, TypeError):
-                meta.set('content', str(metadata['rating']))
-
-        if 'notes' in metadata and metadata['notes']:
-            meta = ET.SubElement(meta_elem, 'meta')
-            meta.set('name', 'calibre:user_notes')
-            meta.set('content', str(metadata['notes']))
-
-        # Year: apart meta element (niet dc:date, want die wordt door publication_date gebruikt)
-        if 'year' in metadata and metadata['year']:
-            meta = ET.SubElement(meta_elem, 'meta')
-            meta.set('name', 'calibre:year')
-            meta.set('content', str(metadata['year']))
-
-        # Author sort: opf:file-as attribuut op dc:creator element
-        # Als er geen dc:creator is, sla op als calibre:author_sort meta element
-        if 'author_sort' in metadata and metadata['author_sort']:
-            creator_elem = meta_elem.find(f'{{{DC_NS}}}creator')
-            if creator_elem is not None:
-                # Standaard Calibre methode: attribuut op dc:creator
-                creator_elem.set(f'{{{OPF_NS}}}file-as', metadata['author_sort'])
-            else:
-                # Fallback: als meta element (voor bestanden zonder author in OPF)
-                meta_as = ET.SubElement(meta_elem, 'meta')
-                meta_as.set('name', 'calibre:author_sort')
-                meta_as.set('content', str(metadata['author_sort']))
-
-        # Publication date: als year al gezet is, overschrijf met volledige datum
-        if 'publication_date' in metadata and metadata['publication_date']:
-            date_elem = meta_elem.find(f'{{{DC_NS}}}date')
-            if date_elem is not None:
-                date_elem.text = metadata['publication_date']
-            else:
-                date_elem = ET.SubElement(meta_elem, f'{{{DC_NS}}}date')
-                date_elem.text = metadata['publication_date']
-
-        # Pages: meta element voor aantal pagina's
-        if 'pages' in metadata and metadata['pages']:
-            meta = ET.SubElement(meta_elem, 'meta')
-            meta.set('name', 'rendition:page-count')
-            meta.set('content', str(metadata['pages']))
-            # Ook als calibre:pages voor compatibiliteit
-            meta2 = ET.SubElement(meta_elem, 'meta')
-            meta2.set('name', 'calibre:pages')
-            meta2.set('content', str(metadata['pages']))
-
-        # Translator: dc:contributor met opf:role="trl"
-        if 'translator' in metadata and metadata['translator']:
-            trans_elem = ET.SubElement(meta_elem, f'{{{DC_NS}}}contributor')
-            trans_elem.text = metadata['translator']
-            trans_elem.set(f'{{{OPF_NS}}}role', 'trl')
-
-        # Illustrator: dc:contributor met opf:role="ill"
-        if 'illustrator' in metadata and metadata['illustrator']:
-            ill_elem = ET.SubElement(meta_elem, f'{{{DC_NS}}}contributor')
-            ill_elem.text = metadata['illustrator']
-            ill_elem.set(f'{{{OPF_NS}}}role', 'ill')
-
-        # Schrijf naar bestand
-        tree = ET.ElementTree(root)
-        with open(opf_path, 'wb') as f:
-            tree.write(f, encoding='UTF-8', xml_declaration=True)
-
-        return True
-
-    except Exception as e:
-        print(f"Error writing OPF metadata to {opf_path}: {e}")
-        return False
-
-
-def modify_opf_tags(ebook_path: Path, tags_to_remove: set, tags_to_add: set) -> bool:
-    """Wijzig tags in een OPF sidecar file.
-
-    Ondersteunt meerdere tags tegelijk toevoegen of verwijderen.
-
-    Args:
-        ebook_path: Path naar het ebook bestand
-        tags_to_remove: Set van tags om te verwijderen (lowercase)
-        tags_to_add: Set van tags om toe te voegen (lowercase, lege set = niets toevoegen)
-
-    Returns:
-        True als wijzigingen gemaakt zijn, False anders
-    """
-    # Lees huidige tags
-    current_tags = read_opf_tags(ebook_path)
-
-    # Pas tags aan - verwijder tags (case-sensitive)
-    new_tags = [t for t in current_tags if t not in tags_to_remove]
-    removed_count = len(current_tags) - len(new_tags)
-
-    # Voeg alle nieuwe tags toe die er nog niet zijn (case-sensitive)
-    tags_added = []
-    for tag_to_add in sorted(tags_to_add):  # Sorteer voor consistente volgorde
-        if tag_to_add not in new_tags:
-            new_tags.append(tag_to_add)
-            tags_added.append(tag_to_add)
-
-    # Check of er wijzigingen zijn
-    if removed_count == 0 and not tags_added:
-        return False
-
-    # Schrijf nieuwe tags
-    return write_opf_tags(ebook_path, new_tags)

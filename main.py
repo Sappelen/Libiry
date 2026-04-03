@@ -25,6 +25,9 @@ except ImportError:
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
+# Gedeelde functies uit core module
+from core.libiry_style import load_field_names, load_selected_types as _load_selected_types_impl
+
 # Windows taskbar icon fix - must be before kivy imports
 if sys.platform == 'win32':
     import ctypes
@@ -138,24 +141,13 @@ def parse_color(color_str: str) -> tuple:
 
 
 def load_selected_types(app_path: Path) -> set:
-    """Load selected file types from selected types.txt."""
-    types = set()
+    """Load selected file types from selected types.txt.
 
-    for folder in ['customize', 'resources']:
-        types_path = app_path / folder / 'selected types.txt'
-        if types_path.exists():
-            try:
-                content = types_path.read_text(encoding='utf-8')
-                for line in content.split('\n'):
-                    line = line.strip().lower()
-                    if line and line.startswith('.'):
-                        types.add(line)
-                if types:
-                    return types
-            except Exception as e:
-                print(f"Error loading selected types: {e}")
-
-    return DEFAULT_FORMATS
+    Gebruikt de gedeelde implementatie uit core/libiry_style.py.
+    Valt terug op DEFAULT_FORMATS als geen types gevonden.
+    """
+    types = _load_selected_types_impl(app_path)
+    return types if types else DEFAULT_FORMATS
 
 
 def load_customization(app_path: Path) -> dict:
@@ -171,8 +163,9 @@ def load_customization(app_path: Path) -> dict:
         'search_box_font_color': (0, 0, 0, 1),
         'rounded_corners': True,
         'only_selected_types': True,
-        'fuzzy_search': False,  # Standaard uit - exacte substring match
-        'scrollbar_width': 10,  # Scrollbar dikte in dp
+        'fuzzy_search': False,  # Default off - exact substring match
+        'metadata_in_sidecar': False,  # Default off - keep metadata in book files when possible
+        'scrollbar_width': 10,  # Scrollbar thickness in dp
         'scrollbar_always_visible': True,  # Scrollbar altijd zichtbaar
         'show_book_title': False,  # Toon titel/auteur op covers met afbeelding
         'show_tags': False,  # Toon tag lijst onderaan scherm (standaard uit)
@@ -217,6 +210,8 @@ def load_customization(app_path: Path) -> dict:
                             settings['only_selected_types'] = value.lower() != 'n'
                         elif key == 'fuzzy search y/n' and value:
                             settings['fuzzy_search'] = value.lower() == 'y'
+                        elif key == 'store metadata in sidecar y/n' and value:
+                            settings['metadata_in_sidecar'] = value.lower() == 'y'
                         elif key == 'scrollbar width' and value:
                             try:
                                 settings['scrollbar_width'] = int(value)
@@ -234,35 +229,13 @@ def load_customization(app_path: Path) -> dict:
                                 settings['ui_font_size'] = int(value)
                             except ValueError:
                                 pass
-                        # Configurable field names
-                        elif key == 'field name cover' and value:
-                            settings['field_names']['cover'] = value
-                        elif key == 'field name booktitle' and value:
-                            settings['field_names']['booktitle'] = value
-                        elif key == 'field name author' and value:
-                            settings['field_names']['author'] = value
-                        elif key == 'field name isbn' and value:
-                            settings['field_names']['isbn'] = value
-                        elif key == 'field name publisher' and value:
-                            settings['field_names']['publisher'] = value
-                        elif key == 'field name language' and value:
-                            settings['field_names']['language'] = value
-                        elif key == 'field name description' and value:
-                            settings['field_names']['description'] = value
-                        elif key == 'field name tags' and value:
-                            settings['field_names']['tags'] = value
-                        elif key == 'field name series' and value:
-                            settings['field_names']['series'] = value
-                        elif key == 'field name series_index' and value:
-                            settings['field_names']['series_index'] = value
-                        elif key == 'field name rating' and value:
-                            settings['field_names']['rating'] = value
-                        elif key == 'field name notes' and value:
-                            settings['field_names']['notes'] = value
                 # Geen break - beide bestanden moeten gelezen worden
                 # (resources eerst voor defaults, customize daarna voor user overrides)
             except Exception as e:
                 print(f"Error loading customization: {e}")
+
+    # Field names via gedeelde functie uit core/libiry_style.py
+    settings['field_names'] = load_field_names(app_path)
 
     return settings
 
@@ -1437,7 +1410,7 @@ class LibiryApp(App):
         else:
             self.btn_support = Button(text='?', size_hint_x=None, width=icon_size, background_color=button_color, font_size=self.ui_font_size)
             toolbar.add_widget(self.btn_support)
-        self.btn_support.bind(on_release=lambda x: webbrowser.open('https://sappelen.com/en/support-2/'))
+        self.btn_support.bind(on_release=lambda x: webbrowser.open('https://libiry.org/Contributing'))
 
         add_spacer()
 
@@ -2710,7 +2683,7 @@ class LibiryApp(App):
         Vind sidecar bestanden (metadata en cover) voor een boek.
 
         Sidecar bestanden volgen het patroon:
-        - book.pdf.opf voor metadata
+        - book.pdf.md voor metadata (Markdown met YAML frontmatter)
         - book.pdf.jpg/.png/.jpeg/.gif/.webp voor cover
 
         Returns: lijst van Path objecten voor bestaande sidecar files
@@ -2720,10 +2693,10 @@ class LibiryApp(App):
 
         sidecars = []
 
-        # Metadata sidecar: book.pdf.opf
-        opf_path = path.parent / (path.name + '.opf')
-        if opf_path.exists():
-            sidecars.append(opf_path)
+        # Metadata sidecar: book.pdf.md
+        md_path = path.parent / (path.name + '.md')
+        if md_path.exists():
+            sidecars.append(md_path)
 
         # Cover sidecar: book.pdf.jpg, book.pdf.png, etc.
         cover_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
@@ -4820,11 +4793,13 @@ class LibiryApp(App):
                 # De file is zojuist gewijzigd, dus de cache entry is stale
                 self.file_cache.invalidate(path)
 
-                # Update tag lijst als tags gewijzigd zijn (case-sensitive)
-                tags_to_remove = original_tags - new_tags
-                tags_to_add = new_tags - original_tags
-                if tags_to_remove or tags_to_add:
-                    self._schedule_tag_list_update()
+                # Volledige refresh zodat grid en tag lijst consistent blijven.
+                # Dit is nodig omdat:
+                # 1. Bij tag filter: bestand kan uit view verdwijnen als tag verwijderd is
+                # 2. Bij subfolder navigatie: bestanden in hoofdfolder moeten ook bijgewerkt
+                # 3. Tag lijst scant recursief alle subfolders
+                # Zonder refresh moet gebruiker handmatig refreshen wat niet intuïtief is.
+                self._refresh()
 
                 self.status_label.text = "Metadata saved"
             except Exception as e:
@@ -4840,33 +4815,43 @@ class LibiryApp(App):
         popup.open()
 
     def _save_full_metadata(self, path: Path, metadata: dict):
-        """Sla volledige metadata op naar een bestand.
+        """Save full metadata to a file.
 
-        Ondersteunt:
-        - Markdown: YAML frontmatter of inline format
-        - EPUB: OPF metadata
-        - PDF: metadata velden (beperkt)
-        - MOBI/AZW: OPF sidecar
+        Supports:
+        - Markdown: YAML frontmatter
+        - EPUB: OPF metadata (internal) or sidecar
+        - PDF: metadata fields or sidecar
+        - MOBI/AZW: Markdown sidecar (always)
+        - CBZ/CBR: ComicInfo.xml or sidecar
+
+        When 'metadata_in_sidecar' setting is True, all metadata is stored
+        in sidecar files instead of in the book files themselves.
 
         Args:
-            path: Path naar het bestand
-            metadata: Dict met alle metadata velden
+            path: Path to the file
+            metadata: Dict with all metadata fields
         """
         file_type = path.suffix.lower()
+        use_sidecar = self.custom.get('metadata_in_sidecar', False)
 
         if file_type in ('.md', '.markdown'):
+            # Markdown files: always save to the file itself (it IS the metadata)
             self._save_markdown_metadata(path, metadata)
+        elif use_sidecar and file_type in ('.epub', '.pdf', '.cbz', '.cbr'):
+            # User prefers sidecar: save all metadata to sidecar file
+            self._save_sidecar_metadata(path, metadata)
         elif file_type == '.epub':
             self._save_epub_metadata(path, metadata)
         elif file_type == '.pdf':
             self._save_pdf_metadata(path, metadata)
         elif file_type in ('.mobi', '.azw', '.azw3'):
+            # MOBI/AZW: always use sidecar (format doesn't support metadata editing)
             self._save_mobi_metadata(path, metadata)
         elif file_type in ('.cbz', '.cbr'):
             self._save_comic_metadata(path, metadata)
         else:
-            # Gebruik OPF sidecar voor onbekende formaten
-            self._save_opf_sidecar_metadata(path, metadata)
+            # Unknown formats: use Markdown sidecar
+            self._save_sidecar_metadata(path, metadata)
 
     def _save_markdown_metadata(self, path: Path, metadata: dict):
         """Sla metadata op in een markdown bestand.
@@ -5129,8 +5114,19 @@ class LibiryApp(App):
 
             # Helper functie om meta element te vinden of maken
             def set_meta(name: str, value: str):
-                """Zoek of maak <meta name="name" content="value"/>."""
-                for meta in metadata_elem.findall('meta'):
+                """Zoek of maak <meta name="name" content="value"/>.
+
+                Zoekt zowel namespaced als non-namespaced meta elementen.
+                Calibre-gegenereerde EPUBs gebruiken vaak {OPF_NS}meta elementen,
+                terwijl andere tools simpele <meta> elementen gebruiken.
+                Zonder beide te doorzoeken ontstaan duplicaten.
+                """
+                # Zoek in beide varianten: met OPF namespace en zonder namespace
+                # Sommige EPUBs (vooral Calibre) gebruiken {OPF_NS}meta, anderen gebruiken <meta>
+                all_metas = list(metadata_elem.findall('meta'))
+                all_metas.extend(metadata_elem.findall('{%s}meta' % OPF_NS))
+
+                for meta in all_metas:
                     if meta.get('name') == name:
                         if value:
                             meta.set('content', value)
@@ -5291,10 +5287,16 @@ class LibiryApp(App):
         """Sla metadata op in een PDF bestand.
 
         PDF ondersteunt beperkte native metadata:
-        - title, author, subject (description), keywords (tags)
+        - title, author, subject (tags - Calibre-compatibel), keywords (behouden)
 
-        Extra velden (isbn, year, language, series, series_index, rating, notes)
-        worden automatisch opgeslagen in een OPF sidecar file.
+        Tags worden in het subject veld opgeslagen met komma-spatie separator.
+        Description past niet in PDF en gaat naar de Markdown sidecar.
+
+        Extra velden (isbn, year, language, series, series_index, rating, notes,
+        description, etc.) worden opgeslagen in een Markdown sidecar file.
+
+        Als PDF succesvol wordt opgeslagen, worden tags NIET naar de sidecar geschreven.
+        Dit voorkomt duplicatie en zorgt dat de sidecar alleen extra velden bevat.
         """
         pdf_saved = False
 
@@ -5309,11 +5311,15 @@ class LibiryApp(App):
             current_meta = doc.metadata
 
             # Native PDF velden
+            # Tags worden in 'subject' veld opgeslagen (Calibre-compatibel).
+            # Het 'keywords' veld wordt vaak misbruikt voor URLs/generator info,
+            # dus we laten dat met rust en gebruiken subject voor tags.
+            # Description wordt NIET in PDF opgeslagen (geen geschikt veld) - alleen in sidecar.
             new_meta = {
                 'title': metadata.get('booktitle', current_meta.get('title', '')),
                 'author': metadata.get('author', current_meta.get('author', '')),
-                'subject': metadata.get('description', current_meta.get('subject', '')),
-                'keywords': ', '.join(metadata.get('tags', [])),
+                'subject': ', '.join(metadata.get('tags', [])),
+                'keywords': current_meta.get('keywords', ''),  # Behoud origineel
                 'creator': current_meta.get('creator', ''),
                 'producer': current_meta.get('producer', ''),
                 'creationDate': current_meta.get('creationDate', ''),
@@ -5344,55 +5350,56 @@ class LibiryApp(App):
             doc.close()
 
         except ImportError:
-            print("PyMuPDF not installed - using OPF sidecar for all PDF metadata")
+            print("PyMuPDF not installed - using sidecar for all PDF metadata")
         except Exception as e:
             print(f"Error saving native PDF metadata: {e}")
 
-        # OPF sidecar ALLEEN voor velden die PDF niet native ondersteunt
-        # PDF native: title, author, subject (description), keywords (tags)
+        # Sidecar ALLEEN voor velden die PDF niet native ondersteunt
+        # PDF native: title, author, subject (nu gebruikt voor tags), keywords (behouden)
         # PDF mist: isbn, language, series, series_index, rating, notes, publisher,
-        #           author_sort, publication_date, pages, translator, illustrator
+        #           author_sort, publication_date, pages, translator, illustrator, description
+        # Description gaat naar sidecar omdat subject voor tags wordt gebruikt.
         extra_fields = ['isbn', 'language', 'series', 'series_index', 'rating', 'notes', 'publisher',
-                        'author_sort', 'publication_date', 'pages', 'translator', 'illustrator']
+                        'author_sort', 'publication_date', 'pages', 'translator', 'illustrator', 'description']
 
         # Bouw metadata dict met alleen de extra velden (geen duplicaten met PDF)
-        opf_metadata = {}
+        sidecar_metadata = {}
         for field in extra_fields:
             if field in metadata and metadata[field]:
-                opf_metadata[field] = metadata[field]
+                sidecar_metadata[field] = metadata[field]
 
-        # Voor problematische PDFs waar native save faalde: alle native velden ook naar OPF
+        # Voor problematische PDFs waar native save faalde: alle native velden ook naar sidecar
         if not pdf_saved:
             native_fields = ['booktitle', 'author', 'description', 'tags']
             for field in native_fields:
                 if metadata.get(field):
-                    opf_metadata[field] = metadata[field]
+                    sidecar_metadata[field] = metadata[field]
 
-        # Alleen OPF aanmaken/updaten als er extra data is
-        if opf_metadata:
-            self._save_opf_sidecar_metadata(path, opf_metadata)
+        # Alleen sidecar aanmaken/updaten als er extra data is
+        if sidecar_metadata:
+            self._save_sidecar_metadata(path, sidecar_metadata)
         else:
-            # Geen extra data - verwijder eventuele bestaande OPF
-            from core.metadata_extractor import get_opf_path
-            opf_path = get_opf_path(path)
-            if opf_path.exists():
+            # Geen extra data - verwijder eventuele bestaande sidecar
+            from core.metadata_extractor import get_sidecar_path
+            sidecar_path = get_sidecar_path(path)
+            if sidecar_path.exists():
                 try:
-                    opf_path.unlink()
+                    sidecar_path.unlink()
                 except Exception:
                     pass
 
     def _save_mobi_metadata(self, path: Path, metadata: dict):
-        """Sla metadata op voor MOBI/AZW via OPF sidecar."""
-        self._save_opf_sidecar_metadata(path, metadata)
+        """Sla metadata op voor MOBI/AZW via Markdown sidecar."""
+        self._save_sidecar_metadata(path, metadata)
 
     def _save_comic_metadata(self, path: Path, metadata: dict):
         """Sla metadata op voor comic bestanden.
 
         CBZ: ComicInfo.xml
-        CBR: OPF sidecar
+        CBR: Markdown sidecar
         """
         if path.suffix.lower() == '.cbr':
-            self._save_opf_sidecar_metadata(path, metadata)
+            self._save_sidecar_metadata(path, metadata)
             return
 
         # CBZ: update ComicInfo.xml
@@ -5466,26 +5473,26 @@ class LibiryApp(App):
                 elif rating_elem is not None:
                     root.remove(rating_elem)
 
-            # Extra velden die ComicInfo.xml niet ondersteunt worden via OPF sidecar opgeslagen
+            # Extra velden die ComicInfo.xml niet ondersteunt worden via sidecar opgeslagen
             # Dit zijn: isbn, author_sort, publication_date
             extra_fields = ['isbn', 'author_sort', 'publication_date']
-            opf_metadata = {}
+            sidecar_metadata = {}
             for field in extra_fields:
                 if field in metadata and metadata[field]:
-                    opf_metadata[field] = metadata[field]
+                    sidecar_metadata[field] = metadata[field]
 
-            # Sla extra velden op in OPF sidecar als er data is
-            if opf_metadata:
-                from core.metadata_extractor import get_opf_path, write_opf_metadata
-                opf_path = get_opf_path(path)
-                write_opf_metadata(opf_path, opf_metadata)
+            # Sla extra velden op in sidecar als er data is
+            if sidecar_metadata:
+                from core.metadata_extractor import get_sidecar_path, write_sidecar_metadata
+                sidecar_path = get_sidecar_path(path)
+                write_sidecar_metadata(sidecar_path, sidecar_metadata)
             else:
-                # Verwijder eventuele bestaande OPF als geen extra velden meer nodig
-                from core.metadata_extractor import get_opf_path
-                opf_path = get_opf_path(path)
-                if opf_path.exists():
+                # Verwijder eventuele bestaande sidecar als geen extra velden meer nodig
+                from core.metadata_extractor import get_sidecar_path
+                sidecar_path = get_sidecar_path(path)
+                if sidecar_path.exists():
                     try:
-                        opf_path.unlink()
+                        sidecar_path.unlink()
                     except Exception:
                         pass
 
@@ -5525,15 +5532,15 @@ class LibiryApp(App):
             print(f"Error saving comic metadata: {e}")
             raise
 
-    def _save_opf_sidecar_metadata(self, path: Path, metadata: dict):
-        """Sla metadata op in een OPF sidecar file.
+    def _save_sidecar_metadata(self, path: Path, metadata: dict):
+        """Sla metadata op in een Markdown sidecar file (YAML frontmatter).
 
         Gebruikt voor formaten die geen native metadata ondersteunen.
         """
-        from core.metadata_extractor import get_opf_path, write_opf_metadata
+        from core.metadata_extractor import get_sidecar_path, write_sidecar_metadata
 
-        opf_path = get_opf_path(path)
-        write_opf_metadata(opf_path, metadata)
+        sidecar_path = get_sidecar_path(path)
+        write_sidecar_metadata(sidecar_path, metadata)
 
     def _start_async_tag_save(self, widgets_by_path: dict, tags_to_remove: set,
                                tags_to_add: set, selected_widgets: list,
@@ -5755,44 +5762,54 @@ class LibiryApp(App):
     def _modify_file_tags(self, path: Path, tags_to_remove: set, tags_to_add: set) -> bool:
         """Modify tags in a file.
 
-        Ondersteunt meerdere tags tegelijk toevoegen of verwijderen.
+        Supports adding/removing multiple tags at once.
 
         Args:
             path: Path to the file
-            tags_to_remove: Set of tags to remove (lowercase)
-            tags_to_add: Set of tags to add (lowercase, lege set = niets toevoegen)
+            tags_to_remove: Set of tags to remove (case-sensitive)
+            tags_to_add: Set of tags to add (case-sensitive)
 
         Returns:
             True if file was modified, False otherwise
 
-        Ondersteunt:
-        - Markdown bestanden met tags: [tag1, tag2] formaat
-        - EPUB bestanden via dc:subject elementen in OPF
-        - PDF bestanden via keywords metadata veld (vereist PyMuPDF)
-        - MOBI/AZW/AZW3 bestanden via EXTH records (vereist ebookmeta)
+        Supports:
+        - Markdown files with tags: [tag1, tag2] format
+        - EPUB files via dc:subject elements in OPF
+        - PDF files via subject metadata field (Calibre-compatible, requires PyMuPDF)
+        - MOBI/AZW/AZW3 files via Markdown sidecar (MOBI itself unreliable)
 
-        Maakt automatisch een backup in systeem temp directory voor elke wijziging.
+        When 'metadata_in_sidecar' setting is True, tags are stored in sidecar
+        files instead of in the book files themselves.
+
+        Creates automatic backup in system temp directory for each change.
         """
+        from core.metadata_extractor import modify_sidecar_tags
+
         file_type = path.suffix.lower()
+        use_sidecar = self.custom.get('metadata_in_sidecar', False)
 
         if file_type in ('.md', '.markdown'):
+            # Markdown files: always modify the file itself
             return self._modify_markdown_tags(path, tags_to_remove, tags_to_add)
+        elif use_sidecar and file_type in ('.epub', '.pdf', '.cbz', '.cbr'):
+            # User prefers sidecar: modify tags in sidecar file
+            return modify_sidecar_tags(path, tags_to_remove, tags_to_add)
         elif file_type == '.epub':
             return self._modify_epub_tags(path, tags_to_remove, tags_to_add)
         elif file_type == '.pdf':
             return self._modify_pdf_tags(path, tags_to_remove, tags_to_add)
         elif file_type in ('.mobi', '.azw', '.azw3'):
+            # MOBI/AZW: always use sidecar (format doesn't support reliable metadata editing)
             return self._modify_mobi_tags(path, tags_to_remove, tags_to_add)
         elif file_type in ('.cbz', '.cbr'):
             return self._modify_comic_tags(path, tags_to_remove, tags_to_add)
         elif file_type == '.opf':
-            # OPF bestanden zijn sidecar files, geen boeken - skip
+            # OPF files are legacy sidecar files - skip
             return False
         else:
-            # Voor alle andere bestandsformaten (.rtf, .mp3, .txt, etc.):
-            # Gebruik OPF sidecar file voor tags opslag
-            from core.metadata_extractor import modify_opf_tags
-            return modify_opf_tags(path, tags_to_remove, tags_to_add)
+            # For all other file formats (.rtf, .mp3, .txt, etc.):
+            # Use Markdown sidecar file for tag storage
+            return modify_sidecar_tags(path, tags_to_remove, tags_to_add)
 
     def _create_temp_backup(self, path: Path) -> Path:
         """Maak een tijdelijke backup van een bestand.
@@ -6337,44 +6354,46 @@ class LibiryApp(App):
         """Modify tags in a PDF file.
 
         Ondersteunt meerdere tags tegelijk toevoegen of verwijderen.
+        Tags worden opgeslagen in het 'subject' veld met komma-spatie separator.
 
-        Als er een OPF sidecar file bestaat (aangemaakt door check_pdf_tags.py),
-        worden tags daar opgeslagen. Anders proberen we de PDF direct te wijzigen.
+        Probeert ALTIJD eerst de PDF direct te wijzigen. Bij succes worden tags
+        uit een eventuele sidecar verwijderd (en de sidecar verwijderd als die leeg is).
+        Alleen als PDF schrijven faalt, wordt de Markdown sidecar gebruikt.
 
         Args:
             path: Path naar de PDF file
-            tags_to_remove: Set van tags om te verwijderen (lowercase)
-            tags_to_add: Set van tags om toe te voegen (lowercase, lege set = niets toevoegen)
+            tags_to_remove: Set van tags om te verwijderen
+            tags_to_add: Set van tags om toe te voegen
 
         Returns:
             True als bestand gewijzigd is, False anders
         """
-        from core.metadata_extractor import get_opf_path, modify_opf_tags
+        from core.metadata_extractor import get_sidecar_path, read_sidecar_metadata, write_sidecar_metadata
 
-        # Check of er een OPF sidecar file bestaat (problematische PDF)
-        if get_opf_path(path).exists():
-            return modify_opf_tags(path, tags_to_remove, tags_to_add)
-
-        # Probeer tags direct in PDF te wijzigen
+        # Probeer PyMuPDF te importeren
         try:
-            # Probeer PyMuPDF te importeren (ondersteunt zowel 'pymupdf' als 'fitz')
             try:
                 import pymupdf as fitz
             except ImportError:
                 import fitz
         except ImportError:
             print("PyMuPDF (fitz) not installed - cannot modify PDF tags")
-            print("Install with: pip install PyMuPDF")
             return False
+
+        pdf_saved = False
 
         try:
             # Open PDF en lees metadata
             doc = fitz.open(str(path))
             metadata = doc.metadata
 
-            # Haal huidige tags uit keywords veld (komma-gescheiden)
-            keywords_str = metadata.get('keywords', '') or ''
-            current_tags = [t.strip() for t in keywords_str.split(',') if t.strip()]
+            # Haal huidige tags uit subject veld (Calibre-compatibel)
+            # Tags worden als één string opgeslagen, gescheiden door ', '
+            subject_str = metadata.get('subject', '') or ''
+            if subject_str:
+                current_tags = [t.strip() for t in subject_str.split(', ') if t.strip()]
+            else:
+                current_tags = []
 
             # Pas tags aan - verwijder tags (case-sensitive)
             new_tags = [t for t in current_tags if t not in tags_to_remove]
@@ -6382,7 +6401,7 @@ class LibiryApp(App):
 
             # Voeg alle nieuwe tags toe die er nog niet zijn (case-sensitive)
             tags_added = []
-            for tag_to_add in sorted(tags_to_add):  # Sorteer voor consistente volgorde
+            for tag_to_add in sorted(tags_to_add):
                 if tag_to_add not in new_tags:
                     new_tags.append(tag_to_add)
                     tags_added.append(tag_to_add)
@@ -6392,27 +6411,25 @@ class LibiryApp(App):
                 doc.close()
                 return False
 
-            # Schrijf nieuwe metadata
-            new_keywords = ', '.join(new_tags)
+            # Schrijf nieuwe metadata - tags naar subject veld met komma-spatie separator
+            new_subject = ', '.join(new_tags)
             doc.set_metadata({
-                'keywords': new_keywords,
-                # Behoud andere metadata
+                'subject': new_subject,
                 'title': metadata.get('title', ''),
                 'author': metadata.get('author', ''),
-                'subject': metadata.get('subject', ''),
+                'keywords': metadata.get('keywords', ''),  # Behoud origineel
                 'creator': metadata.get('creator', ''),
                 'producer': metadata.get('producer', ''),
                 'creationDate': metadata.get('creationDate', ''),
                 'modDate': metadata.get('modDate', ''),
             })
 
-            # Probeer incremental save (snel, wijzigt alleen metadata)
-            # Als dit faalt (sommige PDFs ondersteunen dit niet), gebruik full save
+            # Probeer incremental save
             try:
                 doc.save(str(path), incremental=True, encryption=fitz.PDF_ENCRYPT_KEEP)
+                pdf_saved = True
             except Exception:
                 # Incremental save faalde - probeer full save via temp file
-                # Dit gebeurt bij sommige encrypted PDFs of complexe structuren
                 import tempfile
                 import os
 
@@ -6420,74 +6437,100 @@ class LibiryApp(App):
                 os.close(fd)
 
                 try:
-                    # Save naar temp file (zonder incremental, met garbage collection)
                     doc.save(temp_path, garbage=4, deflate=True)
                     doc.close()
-
-                    # Vervang origineel
                     shutil.move(temp_path, path)
-                    return True
+                    pdf_saved = True
                 except Exception as full_error:
-                    # Ook full save faalde
                     if os.path.exists(temp_path):
                         os.unlink(temp_path)
                     raise full_error
 
             doc.close()
-            return True
 
         except Exception as e:
-            # PDF wijziging faalde - maak automatisch een OPF sidecar file aan
-            # en sla de tags daar op. Dit zorgt ervoor dat problematische PDFs
-            # toch getagd kunnen worden.
             print(f"PDF direct modification failed for {path}: {e}")
-            print("Creating OPF sidecar file for tag storage...")
 
-            # Probeer bestaande tags uit de PDF te lezen
-            existing_tags = []
-            try:
-                try:
-                    import pymupdf as fitz_read
-                except ImportError:
-                    import fitz as fitz_read
-                doc_read = fitz_read.open(str(path))
-                keywords_str = doc_read.metadata.get('keywords', '') or ''
-                existing_tags = [t.strip() for t in keywords_str.split(',') if t.strip()]
-                doc_read.close()
-            except Exception:
-                # Kan ook niet lezen - start met lege tags
-                pass
+        # Als PDF succesvol opgeslagen: verwijder tags uit sidecar
+        if pdf_saved:
+            sidecar_path = get_sidecar_path(path)
+            if sidecar_path.exists():
+                # Lees sidecar metadata, verwijder tags, behoud andere velden
+                sidecar_meta = read_sidecar_metadata(path)
+                if sidecar_meta:
+                    # Bouw nieuwe metadata zonder tags
+                    remaining_meta = {}
+                    for field in ['booktitle', 'author', 'isbn', 'publisher', 'language',
+                                  'description', 'series', 'series_index', 'rating', 'notes',
+                                  'author_sort', 'publication_date', 'pages', 'translator', 'illustrator']:
+                        val = getattr(sidecar_meta, field, None)
+                        if val:
+                            if field == 'author':
+                                # authors is een lijst, author is string
+                                remaining_meta[field] = ', '.join(sidecar_meta.authors) if sidecar_meta.authors else ''
+                            else:
+                                remaining_meta[field] = val
 
-            # Pas tags aan zoals gevraagd (case-sensitive)
-            new_tags = [t for t in existing_tags if t not in tags_to_remove]
-            if tag_to_add and tag_to_add not in new_tags:
+                    # Als er nog andere metadata is, update sidecar zonder tags
+                    # Anders verwijder de hele sidecar
+                    if any(remaining_meta.values()):
+                        write_sidecar_metadata(sidecar_path, remaining_meta)
+                    else:
+                        try:
+                            sidecar_path.unlink()
+                        except Exception:
+                            pass
+            return True
+
+        # PDF schrijven faalde - gebruik sidecar
+        print("Using sidecar file for tag storage...")
+
+        # Lees bestaande tags uit PDF (subject veld) of sidecar
+        existing_tags = []
+        try:
+            doc_read = fitz.open(str(path))
+            subject_str = doc_read.metadata.get('subject', '') or ''
+            if subject_str:
+                existing_tags = [t.strip() for t in subject_str.split(', ') if t.strip()]
+            doc_read.close()
+        except Exception:
+            pass
+
+        # Pas tags aan
+        new_tags = [t for t in existing_tags if t not in tags_to_remove]
+        for tag_to_add in sorted(tags_to_add):
+            if tag_to_add not in new_tags:
                 new_tags.append(tag_to_add)
 
-            # Als er geen tags zijn, voeg een marker toe zodat OPF wel aangemaakt wordt
-            # (write_opf_tags maakt geen bestand aan bij lege lijst)
-            if not new_tags:
-                new_tags = ["__tag_in_OPF__"]
+        # Schrijf naar sidecar met alle bestaande metadata + nieuwe tags
+        sidecar_path = get_sidecar_path(path)
+        sidecar_meta = read_sidecar_metadata(path) if sidecar_path.exists() else None
 
-            # Schrijf naar OPF
-            from core.metadata_extractor import write_opf_tags
-            if write_opf_tags(path, new_tags):
-                print(f"Created OPF sidecar file for {path}")
-                return True
-            else:
-                print(f"Failed to create OPF sidecar file for {path}")
-                return False
+        new_sidecar_data = {}
+        if sidecar_meta:
+            for field in ['booktitle', 'isbn', 'publisher', 'language', 'description',
+                          'series', 'series_index', 'rating', 'notes', 'author_sort',
+                          'publication_date', 'pages', 'translator', 'illustrator']:
+                val = getattr(sidecar_meta, field, None)
+                if val:
+                    new_sidecar_data[field] = val
+            if sidecar_meta.authors:
+                new_sidecar_data['author'] = ', '.join(sidecar_meta.authors)
+
+        new_sidecar_data['tags'] = new_tags if new_tags else ['__tag_in_sidecar__']
+        write_sidecar_metadata(sidecar_path, new_sidecar_data)
+        return True
 
     def _modify_mobi_tags(self, path: Path, tags_to_remove: set, tags_to_add: set) -> bool:
-        """Modify tags for MOBI/AZW files via OPF sidecar file.
+        """Modify tags for MOBI/AZW files via Markdown sidecar file.
 
         Ondersteunt meerdere tags tegelijk toevoegen of verwijderen.
 
         MOBI/AZW metadata is niet betrouwbaar te wijzigen, dus we gebruiken
-        een OPF sidecar file (zelfde naam, .opf extensie) voor tags.
-        Dit is compatible met Calibre's aanpak.
+        een Markdown sidecar file (zelfde naam, .md extensie) voor tags.
         """
-        from core.metadata_extractor import modify_opf_tags
-        return modify_opf_tags(path, tags_to_remove, tags_to_add)
+        from core.metadata_extractor import modify_sidecar_tags
+        return modify_sidecar_tags(path, tags_to_remove, tags_to_add)
 
     def _modify_comic_tags(self, path: Path, tags_to_remove: set, tags_to_add: set) -> bool:
         """Modify tags in a CBZ/CBR comic archive.
@@ -6495,22 +6538,22 @@ class LibiryApp(App):
         Ondersteunt meerdere tags tegelijk toevoegen of verwijderen.
 
         CBZ: Tags worden opgeslagen in ComicInfo.xml in het archive.
-        CBR: Tags worden opgeslagen in OPF sidecar file (RAR is niet schrijfbaar).
+        CBR: Tags worden opgeslagen in Markdown sidecar file (RAR is niet schrijfbaar).
 
         Args:
             path: Path naar het comic archive
-            tags_to_remove: Set van tags om te verwijderen (lowercase)
-            tags_to_add: Set van tags om toe te voegen (lowercase, lege set = niets toevoegen)
+            tags_to_remove: Set van tags om te verwijderen (case-sensitive)
+            tags_to_add: Set van tags om toe te voegen (case-sensitive)
 
         Returns:
             True als bestand gewijzigd is, False anders
         """
         file_type = path.suffix.lower()
 
-        # CBR: gebruik OPF sidecar file (RAR is niet schrijfbaar)
+        # CBR: gebruik sidecar file (RAR is niet schrijfbaar)
         if file_type == '.cbr':
-            from core.metadata_extractor import modify_opf_tags
-            return modify_opf_tags(path, tags_to_remove, tags_to_add)
+            from core.metadata_extractor import modify_sidecar_tags
+            return modify_sidecar_tags(path, tags_to_remove, tags_to_add)
 
         # CBZ: schrijf naar ComicInfo.xml in het archive
         import zipfile
@@ -6819,7 +6862,7 @@ class LibiryApp(App):
         add_yn_field('Rounded corners', 'rounded_corners', self.custom['rounded_corners'])
         add_yn_field('Only selected file types', 'only_selected_types', self.custom['only_selected_types'])
         add_yn_field('Fuzzy search', 'fuzzy_search', self.custom.get('fuzzy_search', False))
-        # Multi-book markdown setting verwijderd - detectie is nu automatisch via file_cache
+        add_yn_field('Store metadata in sidecar', 'metadata_in_sidecar', self.custom.get('metadata_in_sidecar', False))
 
         # === FIELD NAME SETTINGS ===
         add_section_header('Field names')
@@ -6920,7 +6963,7 @@ class LibiryApp(App):
         lines.append(f"Rounded corners y/n: {'Y' if inputs['rounded_corners'].active else 'N'}")
         lines.append(f"Only selected file types y/n: {'Y' if inputs['only_selected_types'].active else 'N'}")
         lines.append(f"Fuzzy search y/n: {'Y' if inputs['fuzzy_search'].active else 'N'}")
-        # Multi-book markdown setting verwijderd - detectie is nu automatisch via file_cache
+        lines.append(f"Store metadata in sidecar y/n: {'Y' if inputs['metadata_in_sidecar'].active else 'N'}")
         lines.append(f"Scrollbar width: {inputs['scrollbar_width'].text}")
         lines.append(f"Scrollbar always visible y/n: {'Y' if inputs['scrollbar_always_visible'].active else 'N'}")
         lines.append(f"Show book title y/n: {'Y' if inputs['show_book_title'].active else 'N'}")

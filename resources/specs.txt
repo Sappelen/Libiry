@@ -206,7 +206,7 @@ TESTEDBYUSER: Selectie-telling: op de onderste regel tonen hoeveel items geselec
 DELETED: Delete waarschuwing voor multi-book markdown files - multi-book support is verwijderd
 TESTEDBYUSER: Delete waarschuwing: bij verwijderen van een folder waar nog bestanden in staan (of ze nu wel of niet getoond worden in de tool, dat maakt niet uit), toon "Beware! This action will delete the files in this folder too!". Pas de tekst aan naar "Beware! This action will delete the files in these folders too!" als er meer dan 1 folder bij de geselecteerde tiles zit
 TESTEDBYUSER: Na Move/Delete cancel worden alle geselecteerde items gedeselecteerd (consistent met Edit gedrag)
-TESTEDBYUSER: Move en Delete verplaatsen/verwijderen ook bijbehorende sidecar files (metadata .opf en cover images .jpg/.png/etc.) samen met het boek
+TOBETESTED: Move en Delete verplaatsen/verwijderen ook bijbehorende sidecar files (metadata .md en cover images .jpg/.png/etc.) samen met het boek
 TESTEDBYUSER: Move naar een folder waar sommige bestanden al staan: overslaan zonder error, alleen verplaatsen wat er nog niet staat. Statusbalk toont "(X already there)". Geen error popup voor overgeslagen bestanden.
 
 HIDDEN FILES EN FOLDERS
@@ -258,9 +258,9 @@ Tags zijn labels/categorieën die aan boeken gekoppeld kunnen worden, vergelijkb
 TESTEDBYUSER: Tags uit markdown YAML frontmatter lezen - formaat: "tags: [fiction, sci-fi]" of "tags:\n  - fiction\n  - sci-fi"
 TESTEDBYUSER: Tags uit markdown inline lezen (multi-book format) - formaat: "[tags]: fiction, sci-fi" (configureerbare veldnaam)
 TESTEDBYUSER: Tags uit EPUB metadata lezen - uit dc:subject elementen in OPF (was al geïmplementeerd)
-TESTEDBYUSER: Tags uit MOBI/AZW/AZW3 lezen - via OPF sidecar file (zelfde naam, .opf extensie)
-TESTEDBYUSER: Tags uit CBR lezen - via OPF sidecar file (RAR is niet leesbaar voor tags)
-TESTEDBYUSER: Tags uit PDF lezen - uit keywords veld, of uit OPF sidecar als die bestaat (voor problematische PDFs)
+TOBETESTED: Tags uit MOBI/AZW/AZW3 lezen - via Markdown sidecar file (zelfde naam, .md extensie)
+TOBETESTED: Tags uit CBR lezen - via Markdown sidecar file (RAR is niet leesbaar voor tags)
+TOBETESTED: Tags uit PDF lezen - uit subject veld (komma-spatie separator), of uit Markdown sidecar als die bestaat (voor problematische PDFs)
 TESTEDBYUSER: Tags opslaan in BookItem datastructuur als list[str]
 TESTEDBYUSER: Tags normaliseren: trimmen, lege tags verwijderen, case behouden
 
@@ -289,31 +289,40 @@ TESTEDBYUSER: Voor EPUB zonder bestaande tags: dc:subject correct toevoegen (Win
 TESTEDBYUSER: Voor EPUB extra velden: author_sort als opf:file-as, publication_date in dc:date, pages als meta, translator/illustrator als dc:contributor met role
 TESTEDBYUSER: Voor MOBI/AZW/AZW3: author, publisher, language worden nu uit OPF sidecar gelezen (user edits overschrijven ebookmeta waarden)
 TESTEDBYUSER: Voor CBZ: author (Writer), publisher, series, series_index (Number) worden correct opgeslagen in ComicInfo.xml en teruggelezen
-TESTEDBYUSER: Voor PDF: keywords metadata veld bijwerken via PyMuPDF, of naar OPF sidecar als die bestaat
-TESTEDBYUSER: Voor MOBI/AZW/AZW3: tags opslaan in OPF sidecar file (zelfde naam, .opf extensie)
+TOBETESTED: Voor PDF: subject metadata veld bijwerken via PyMuPDF (komma-spatie separator), of naar Markdown sidecar als die bestaat
+TOBETESTED: Voor MOBI/AZW/AZW3: tags opslaan in Markdown sidecar file (zelfde naam, .md extensie)
 TESTEDBYUSER: Voor CBZ: ComicInfo.xml Tags element bijwerken (schrijft eerst naar temp file, dan move)
-TESTEDBYUSER: Voor CBR: tags opslaan in OPF sidecar file (RAR is niet schrijfbaar)
+TOBETESTED: Voor CBR: tags opslaan in Markdown sidecar file (RAR is niet schrijfbaar)
 TESTEDBYUSER: Na Edit Tags save/cancel worden alle geselecteerde items gedeselecteerd
 DELETED: Multi-book markdown files batch wijziging - multi-book support is verwijderd
 TOBEBUILTNICETOHAVE: Tag autocomplete - suggesties op basis van bestaande tags in bibliotheek
 
-=== OPF Sidecar Files ===
-TESTEDBYUSER: OPF sidecar files worden gebruikt voor formaten waar tags niet direct opgeslagen kunnen worden
-TESTEDBYUSER: OPF file heeft zelfde naam als ebook maar met .opf extensie (bijv. book.mobi -> book.mobi.opf)
-TESTEDBYUSER: OPF formaat is compatibel met Calibre (dc:subject elementen)
-TESTEDBYUSER: check_pdf_tags.py script test welke PDFs tags kunnen lezen/schrijven en maakt OPF sidecar voor problematische PDFs
-TESTEDBYUSER: Voor alle onbekende bestandsformaten (bijv. .rtf, .mp3, .txt): gebruik automatisch OPF sidecar file voor tags
-TESTEDBYUSER: OPF files zelf (.opf) worden niet getoond in het grid en krijgen geen eigen sidecar
+=== Markdown Sidecar Files ===
+TOBETESTED: Markdown sidecar files worden gebruikt voor formaten waar tags niet direct opgeslagen kunnen worden
+TOBETESTED: Sidecar file heeft zelfde naam als ebook maar met .md extensie (bijv. book.mobi -> book.mobi.md)
+TOBETESTED: Sidecar formaat is YAML frontmatter (booktitle, author, tags, etc.) - mensvriendelijk en bewerkbaar
+TOBETESTED: Tags met komma worden gequote in de sidecar file, quotes verborgen in UI
+DELETED: check_pdf_tags.py - vervangen door Check_and_consolidate_metadata.py
+TOBETESTED: Check_and_consolidate_metadata.py voert 4 taken uit:
+TOBETESTED: 1. Opschonen van lege sidecars (waar alle velden leeg zijn)
+TOBETESTED: 2. Rapport van conflicterende metadata (afwijkend in sidecar vs in het boek zelf)
+TOBETESTED: 3. Test PDFs en maak sidecars voor problematische PDFs
+TOBETESTED: 4. Rapport van alle problematische PDFs
+TOBETESTED: CLI support: python Check_and_consolidate_metadata.py [folder] [--dry-run] [--quiet]
+TOBETESTED: Windows batch: Check_and_consolidate_metadata.bat voor makkelijk starten
+TOBETESTED: Genereert een rapport bestand (metadata_report_YYYYMMDD_HHMMSS.txt) in de gescande folder
+TOBETESTED: Voor alle onbekende bestandsformaten (bijv. .rtf, .mp3, .txt): gebruik automatisch Markdown sidecar file voor tags
+TOBETESTED: Sidecar files (.md) naast ebooks worden niet als eigen boeken getoond in het grid
 
 === PDF Metadata ===
-TESTEDBYUSER: PDF native metadata (titel, auteur, beschrijving, tags) heeft prioriteit bij lezen en schrijven
-TESTEDBYUSER: PDF native velden: title, author, subject (description), keywords (tags) - worden direct in PDF opgeslagen
-TESTEDBYUSER: PDF extra velden via OPF sidecar: isbn, language, series, series_index, rating, notes, publisher, author_sort, publication_date, pages, translator, illustrator
-TESTEDBYUSER: OPF sidecar wordt alleen aangemaakt als er extra velden zijn die PDF niet ondersteunt
-TESTEDBYUSER: Voor problematische PDFs waar native save faalt: alle native velden (booktitle, author, description, tags) worden ook naar OPF sidecar geschreven
-TESTEDBYUSER: Bij lezen: booktitle, author, description, tags uit OPF als fallback wanneer PDF die velden niet heeft
-TESTEDBYUSER: Geen duplicatie: velden die in PDF staan worden niet ook in OPF opgeslagen
-TESTEDBYUSER: Als geen extra velden meer nodig zijn wordt bestaande OPF sidecar verwijderd
+TOBETESTED: PDF native metadata (titel, auteur, tags) heeft prioriteit bij lezen en schrijven
+TOBETESTED: PDF native velden: title, author, subject (tags met komma-spatie separator) - worden direct in PDF opgeslagen
+TOBETESTED: PDF extra velden via Markdown sidecar: isbn, language, series, series_index, rating, notes, publisher, author_sort, publication_date, pages, translator, illustrator, description
+TOBETESTED: Markdown sidecar wordt alleen aangemaakt als er extra velden zijn die PDF niet ondersteunt
+TOBETESTED: Voor problematische PDFs waar native save faalt: alle native velden (booktitle, author, description, tags) worden ook naar sidecar geschreven
+TOBETESTED: Bij lezen: booktitle, author, description, tags uit sidecar als fallback wanneer PDF die velden niet heeft
+TOBETESTED: Geen duplicatie: velden die in PDF staan worden niet ook in sidecar opgeslagen
+TOBETESTED: Als geen extra velden meer nodig zijn wordt bestaande sidecar verwijderd
 
 === FASE 4: Tags filteren ===
 TOBEBUILTNICETOHAVE: Filter op één of meerdere tags (AND/OR)
@@ -345,13 +354,13 @@ TESTEDBYUSER: Output bestanden zijn compatibel met Libiry, Obsidian en andere ma
 
 CALIBRE2LIBIRY (COMPANION TOOL)
 -------------------------------
-TESTEDBYUSER: Calibre2Libiry hernoemt Calibre metadata.opf bestanden naar Libiry formaat
-TESTEDBYUSER: Calibre slaat metadata op als metadata.opf, Libiry als {boekbestand}.opf
-TESTEDBYUSER: Zoekt recursief alle metadata.opf bestanden in een Calibre library
-TESTEDBYUSER: Vindt het bijbehorende ebook in dezelfde folder
-TESTEDBYUSER: Hernoemt metadata.opf naar {ebook_naam}.opf (bijv. Book.epub.opf)
-TESTEDBYUSER: Hernoemt de book cover van coverimage.jpg naar {ebook_naam}.jpg (bijv. Book.epub.jpg)
-TESTEDBYUSER: Toont eerst een preview (dry run) voor bevestiging
-TESTEDBYUSER: Waarschuwt dat Calibre de hernoemde metadata.opf niet meer ziet
+TOBETESTED: Calibre2Libiry converteert Calibre metadata.opf bestanden naar Libiry Markdown sidecar formaat
+TOBETESTED: Calibre slaat metadata op als metadata.opf (XML), Libiry als {boekbestand}.md (YAML frontmatter)
+TOBETESTED: Zoekt recursief alle metadata.opf bestanden in een Calibre library
+TOBETESTED: Vindt het bijbehorende ebook in dezelfde folder
+TOBETESTED: Leest metadata uit metadata.opf en schrijft naar {ebook_naam}.md (bijv. Book.epub.md)
+TOBETESTED: Hernoemt de book cover van cover.jpg naar {ebook_naam}.jpg (bijv. Book.epub.jpg)
+TOBETESTED: Originele metadata.opf blijft behouden (wordt niet verwijderd)
+TOBETESTED: Toont eerst een preview (dry run) voor bevestiging
 TESTEDBYUSER: CLI support: python Calibre2Libiry.py [calibre_library_path]
 TESTEDBYUSER: Windows batch: Calibre2Libiry.bat voor makkelijk starten

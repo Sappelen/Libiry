@@ -1,0 +1,62 @@
+# Language Code Mapping - ISO 639-1 (2-letter) to ISO 639-2 (3-letter)
+# Used by Check_and_consolidate_metadata to normalize language codes before comparison
+# Format: 2-letter=3-letter
+# Lines starting with # are comments
+# Users can add custom mappings below
+
+# Common European languages
+nl=nld
+en=eng
+de=deu
+fr=fra
+es=spa
+it=ita
+pt=por
+ru=rus
+pl=pol
+cs=ces
+sk=slk
+hu=hun
+ro=ron
+bg=bul
+hr=hrv
+sr=srp
+sl=slv
+uk=ukr
+be=bel
+
+# Scandinavian languages
+da=dan
+sv=swe
+no=nor
+fi=fin
+is=isl
+
+# Other common languages
+el=ell
+tr=tur
+ar=ara
+he=heb
+fa=per
+hi=hin
+zh=zho
+ja=jpn
+ko=kor
+vi=vie
+th=tha
+id=ind
+ms=msa
+
+# Celtic languages
+ga=gle
+cy=cym
+gd=gla
+
+# Baltic languages
+lt=lit
+lv=lav
+et=est
+
+# Other
+la=lat
+eo=epo

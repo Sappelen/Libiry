@@ -7,14 +7,8 @@ import tempfile
 import shutil
 from typing import Optional, Dict
 
-
-# Default field names
-DEFAULT_FIELD_NAMES = {
-    'cover': 'cover',
-    'booktitle': 'booktitle',
-    'author': 'author',
-    'isbn': 'isbn',
-}
+# Import van centrale locatie - geen dubbele code!
+from core.libiry_style import DEFAULT_FIELD_NAMES
 
 
 class CoverExtractor:
