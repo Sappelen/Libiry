@@ -1,32 +1,32 @@
-"""SQLite-backed thumbnail cache for fast grid loading."""
+"""SQLite-backed thumbnail cache for fast grid loading
+   cover_extractor.py is used here. The division of labour is clean:
+  - cover_extractor.py knows how to get a raw PIL.Image out of any format (EPUB, MOBI, PDF, CBZ, CBR, Markdown, sidecar image). All the format-specific logic lives there
+  - cover_cache.py knows nothing about formats. It checks the SQLite cache, calls extractor.extract(filepath) on a miss, then resizes/crops the result to a thumbnail and saves it to disk.  It receives the CoverExtractor instance as a parameter rather than importing it, so there's no circular dependency
+  cover_cache.py does own one piece of image work itself — _save_thumbnail, _center_crop_resize, and _create_blank_cover — but that's post-processing on the already-extracted PIL Image, not extraction. So the split is:
+  - Format-specific extraction    cover_extractor.py 
+  - Sidecar image lookup          cover_extractor.py 
+  - Cache lookup / invalidation   cover_cache.py     
+  - Thumbnail resize + crop       cover_cache.py     
+  - Blank placeholder generation  cover_cache.py"""
 
 from pathlib import Path
 import sqlite3
 import hashlib
 from PIL import Image, ImageDraw, ImageFont
 from typing import Optional
-import os
-
 
 class CoverCache:
-    """
-    SQLite-backed thumbnail cache for fast grid loading.
-
+    """SQLite-backed thumbnail cache for fast grid loading
     Stores thumbnails on disk and tracks file modification times
-    to invalidate cache when source files change.
-    """
+    to invalidate cache when source files change"""
 
     THUMB_SIZE = (200, 300)
     BLANK_COLOR = (240, 240, 240)
     TEXT_COLOR = (100, 100, 100)
 
     def __init__(self, cache_dir: Path):
-        """
-        Initialize cover cache.
-
-        Args:
-            cache_dir: Directory to store cache database and thumbnails
-        """
+        """ Initialize cover cache
+        Arg cache_dir: Directory to store cache database and thumbnails"""
         self.cache_dir = cache_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.thumbs_dir = cache_dir / "thumbs"
@@ -35,7 +35,7 @@ class CoverCache:
         self._init_db()
 
     def _init_db(self):
-        """Initialize SQLite database schema."""
+        """Initializes SQLite database schema"""
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS covers (
@@ -50,16 +50,11 @@ class CoverCache:
             """)
 
     def get_cover(self, filepath: Path, extractor) -> Path:
-        """
-        Get cached thumbnail path, extracting and caching if needed.
-
+        """Get cached thumbnail path, extracting and caching if needed
         Args:
             filepath: Path to the ebook file
             extractor: CoverExtractor instance
-
-        Returns:
-            Path to the thumbnail image
-        """
+        Returns Path to the thumbnail image"""
         try:
             mtime = filepath.stat().st_mtime
         except OSError:
@@ -93,16 +88,11 @@ class CoverCache:
         return thumb_path
 
     def _save_thumbnail(self, filepath: Path, cover: Optional[Image.Image]) -> Path:
-        """
-        Save thumbnail to disk.
-
+        """Save thumbnail to disk
         Args:
             filepath: Original file path (used for hash)
             cover: PIL Image or None for blank cover
-
-        Returns:
-            Path to saved thumbnail
-        """
+        Returns Path to saved thumbnail"""
         path_hash = hashlib.md5(str(filepath).encode()).hexdigest()
         thumb_path = self.thumbs_dir / f"{path_hash}.png"
 
@@ -120,26 +110,18 @@ class CoverCache:
             cover = self._center_crop_resize(cover, self.THUMB_SIZE)
             cover.save(thumb_path, 'PNG')
         else:
-            # No cover - don't create blank, let main.py handle fallback to book.png
+            # no cover - don't create blank, let main.py handle fallback to book.png
             self._create_blank_cover(filepath.stem, thumb_path)
 
         return thumb_path
 
     def _center_crop_resize(self, img: Image.Image, target_size: tuple) -> Image.Image:
-        """
-        Resize image to fill target size using center crop.
-
-        The image is scaled to completely cover the target size while maintaining
-        aspect ratio, then cropped from the center to fit exactly.
-        This avoids distortion while ensuring no empty space.
-
+        """Resize image to fill target size using center crop
+        The image is scaled to completely cover the target size while maintaining aspect ratio, then cropped from the center to fit exactly. This avoids distortion while ensuring no empty space.
         Args:
             img: Source PIL Image
             target_size: (width, height) tuple
-
-        Returns:
-            Center-cropped and resized image
-        """
+        Returns Center-cropped and resized image"""
         target_w, target_h = target_size
         img_w, img_h = img.size
 
@@ -168,7 +150,7 @@ class CoverCache:
         return img.crop((left, top, right, bottom))
 
     def _create_blank_cover(self, title: str, save_path: Path):
-        """Create a blank cover with the title text."""
+        """Create a blank cover with the title text"""
         img = Image.new('RGB', self.THUMB_SIZE, self.BLANK_COLOR)
         draw = ImageDraw.Draw(img)
 
@@ -227,7 +209,7 @@ class CoverCache:
         img.save(save_path, 'PNG')
 
     def _get_blank_cover_path(self, title: str) -> Path:
-        """Get path to a blank cover, creating if needed."""
+        """Get path to a blank cover, creating if needed"""
         path_hash = hashlib.md5(f"blank_{title}".encode()).hexdigest()
         thumb_path = self.thumbs_dir / f"{path_hash}.png"
         if not thumb_path.exists():
@@ -235,7 +217,7 @@ class CoverCache:
         return thumb_path
 
     def clear_cache(self):
-        """Clear all cached thumbnails."""
+        """Clear all cached thumbnails"""
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("DELETE FROM covers")
 
@@ -246,43 +228,10 @@ class CoverCache:
                 pass
 
     def has_real_cover(self, filepath: Path) -> bool:
-        """Check if a file has a real cover (not a placeholder)."""
+        """Check if a file has a real cover (not a placeholder)"""
         with sqlite3.connect(self.db_path) as conn:
             row = conn.execute(
                 "SELECT has_cover FROM covers WHERE file_path = ?",
                 (str(filepath),)
             ).fetchone()
             return bool(row and row[0])
-
-    def get_cache_stats(self) -> dict:
-        """Get cache statistics."""
-        with sqlite3.connect(self.db_path) as conn:
-            total = conn.execute("SELECT COUNT(*) FROM covers").fetchone()[0]
-            with_cover = conn.execute(
-                "SELECT COUNT(*) FROM covers WHERE has_cover = 1"
-            ).fetchone()[0]
-
-        thumb_count = len(list(self.thumbs_dir.glob("*.png")))
-        cache_size = sum(f.stat().st_size for f in self.thumbs_dir.glob("*.png"))
-
-        return {
-            'total_entries': total,
-            'with_cover': with_cover,
-            'without_cover': total - with_cover,
-            'thumb_files': thumb_count,
-            'cache_size_mb': cache_size / (1024 * 1024)
-        }
-
-    def get_cache_path(self, filepath: Path, suffix: str = "") -> Path:
-        """
-        Get the cache path for a file with optional suffix.
-
-        Args:
-            filepath: Original file path
-            suffix: Optional suffix for multi-book files (e.g., "_book0")
-
-        Returns:
-            Path where thumbnail would be stored
-        """
-        path_hash = hashlib.md5(f"{filepath}{suffix}".encode()).hexdigest()
-        return self.thumbs_dir / f"{path_hash}.png"

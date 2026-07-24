@@ -1,23 +1,20 @@
 @echo off
-REM Calibre2Libiry - Convert Calibre metadata & covers to Libiry format
-REM Double-click to open GUI, or pass a path for CLI mode
-
+:: Calibre2Libiry.bat — Launch Calibre2Libiry via the shared launcher.
+:: No arguments : GUI mode   — pythonw.exe, no console window.
+:: --debug      : Debug mode — python.exe, console stays open.
+:: Other args   : CLI mode   — forwarded to Calibre2Libiry.py, console stays open.
 cd /d "%~dp0"
-
-REM Check of er een argument is (CLI mode) of niet (GUI mode)
 if "%~1"=="" (
-    REM GUI mode - gebruik pythonw (geen console popup)
     if exist "venv\Scripts\pythonw.exe" (
-        start "" venv\Scripts\pythonw.exe Calibre2Libiry.py
+        start "" venv\Scripts\pythonw.exe launcher.py calibre2libiry
     ) else (
-        start "" pythonw Calibre2Libiry.py
+        start "" pythonw launcher.py calibre2libiry
     )
 ) else (
-    REM CLI mode - met console voor output
     if exist "venv\Scripts\python.exe" (
-        venv\Scripts\python.exe Calibre2Libiry.py %*
+        venv\Scripts\python.exe launcher.py calibre2libiry %*
     ) else (
-        python Calibre2Libiry.py %*
+        python launcher.py calibre2libiry %*
     )
     pause
 )

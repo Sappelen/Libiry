@@ -1,7 +1,0 @@
-Location:
-Background color: #6F9D9F
-Button color: #793F4E
-Search box color: white
-Tile font color: black
-Background font color: white
-Search box font color: black

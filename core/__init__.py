@@ -1,1 +1,1 @@
-"""Libiry core module - ebook handling utilities."""
+"""Libiry core module - ebook handling utilities"""

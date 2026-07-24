@@ -1,52 +1,52 @@
 # Building Libiry Installers
 
-Dit document beschrijft hoe je Libiry installers bouwt voor distributie.
+This document describes how to build Library installers for distribution.
 
-## Snelle Start
+## Quick Start
 
-### Windows (LibirySetup.exe maken)
+### Windows (creating LibrarySetup.exe)
 
-1. Installeer [Inno Setup 6](https://jrsoftware.org/isinfo.php) (gratis)
-2. Dubbelklik op `build_windows.bat`
-3. Resultaat: `dist\installer\LibirySetup.exe`
+1. Install [Inno Setup 6](https://jrsoftware.org/isinfo.php) (free)
+2. Double-click on `build_windows.bat`
+3. Result: `dist\installer\LibirySetup.exe`
 
-### macOS (.dmg maken)
+### macOS (creating .dmg)
 
 ```bash
 chmod +x build_macos.sh
 ./build_macos.sh
 ```
-Resultaat: `dist/installer/Libiry-Installer.dmg`
+Result: `dist/installer/Libiry-Installer.dmg`
 
-### Linux (AppImage maken)
+### Linux (creating AppImage)
 
 ```bash
 chmod +x build_linux.sh
 ./build_linux.sh
 ```
-Resultaat: `dist/installer/Libiry-x86_64.AppImage`
+Result: `dist/installer/Libiry-x86_64.AppImage`
 
 ---
 
-## Automatische Builds via GitHub
+## Automatic Builds via GitHub
 
-Na het pushen naar GitHub worden installers automatisch gebouwd bij elke release:
+After the push to GitHub, installers are automatically built with every release:
 
 ```bash
-# Maak een nieuwe release
+# Create a new release
 git tag v1.0.0
 git push origin v1.0.0
 ```
 
-De installers verschijnen dan op de GitHub Releases pagina.
+The installers will then appear on the GitHub Releases page.
 
 ---
 
-## Handmatig Bouwen (Stap voor Stap)
+## Manual Build (Step by Step)
 
-### Vereisten
+### Requirements
 
-| Platform | Vereist |
+| Platform | Required |
 |----------|---------|
 | Windows | Python 3.10+, Inno Setup 6 |
 | macOS | Python 3.10+, Xcode Command Line Tools |
@@ -54,29 +54,29 @@ De installers verschijnen dan op de GitHub Releases pagina.
 
 ### Windows Details
 
-1. **PyInstaller** bundelt Python + Kivy + alle dependencies
-2. **Inno Setup** maakt de installer met:
+1. **PyInstaller** bundles Python + Kivy + all dependencies
+2. **Inno Setup** creates the installer with:
    - Desktop shortcut
    - Start Menu entry
    - Uninstaller in Windows Apps
 
 ### macOS Details
 
-1. **PyInstaller** maakt een `.app` bundle
-2. **hdiutil** maakt een `.dmg` disk image
-3. Icon wordt automatisch geconverteerd naar `.icns`
+1. **PyInstaller** creates an `.app` bundle
+2. **hdiutil** creates a `.dmg` disk image
+3. Icon is automatically converted to `.icns`
 
 ### Linux Details
 
-1. **PyInstaller** bundelt alles naar één folder
-2. **appimagetool** maakt een `.AppImage`
-3. Werkt op Ubuntu, Fedora, Arch, en andere distributies
+1. **PyInstaller** bundles everything into one folder
+2. **appimagetool** creates an `.AppImage`
+3. Works on Ubuntu, Fedora, Arch and other distributions
 
 ---
 
 ## Bestanden
 
-| Bestand | Doel |
+| File | Target |
 |---------|------|
 | `libiry.spec` | PyInstaller config (Windows) |
 | `libiry_macos.spec` | PyInstaller config (macOS/Linux) |

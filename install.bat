@@ -46,6 +46,6 @@ echo ========================================
 echo  Installation complete!
 echo ========================================
 echo.
-echo To run Libiry, use: run.bat
+echo To run Libiry, use: Libiry.bat
 echo.
 pause

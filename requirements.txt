@@ -1,6 +1,9 @@
 # Kivy Framework (cross-platform: Windows, Linux, macOS, Android, iOS)
 kivy>=2.3.0
 
+# Cross-platform file chooser, notifications, etc. (used by libiry2go and other satellite apps)
+plyer>=2.1.0
+
 # Image processing
 Pillow>=10.0.0
 
@@ -9,6 +12,13 @@ ebookmeta>=1.2.0
 
 # MOBI/AZW3 support (optional but recommended)
 mobi>=0.3.0
+
+# Optional: full HTML cleaning in descriptions (recommended for at least all Obsidian users)
+# Without these, basic regex stripping is used as a fallback
+# Note that the fallback (re.sub(r'<[^>]+>', '', text)) doesn't convert <br> → newline
+# Note that the fallback does not handle mojibake (e.g., Ã© → é)
+beautifulsoup4>=4.12.0
+ftfy>=6.0.0
 
 # PDF support
 PyMuPDF>=1.23.0
@@ -24,3 +34,6 @@ send2trash>=1.8.0
 
 # For building iOS (optional, macOS only)
 # kivy-ios>=2.0.0
+
+# For processing CBR files (optional)
+# rarfile>=4.0 

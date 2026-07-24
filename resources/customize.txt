@@ -1,29 +1,40 @@
 Location:
 Background color: #6F9D9F
+Background font color: black
 Button color: #793F4E
-Button font color: black
+Button font color: white
 Search box color: white
 Tile font color: black
-Background font color: white
 Search box font color: black
-Rounded corners y/n: y
-Only selected file types y/n: y
+Rounded corners: Y
+Fuzzy search: N
+Store metadata in sidecar: N
+Scrollbar width: 20
+Scrollbar always visible: Y
+Show book title: Y
+Show tags: N
+Font size: 12
+Tag number: 100
 
-# Configurable field names (volgorde gebaseerd op Goodreads CSV export)
+# Configurable field names (sequence based on Goodreads CSV export)
 Field name cover: cover
 Field name booktitle: booktitle
 Field name author: author
+Field name author_sort: author_sort
 Field name isbn: isbn
 Field name rating: rating
 Field name publisher: publisher
-Field name year: year
+Field name publication_date: publication_date
+Field name pages: pages
 Field name language: language
 Field name tags: tags
 Field name series: series
 Field name series_index: series_index
+Field name translator: translator
+Field name illustrator: illustrator
 Field name description: description
 Field name notes: notes
 
-# Configurable field names (uitsluitend voor gebruik in Libiry2Go)
-Field name file_created: created
-Field name file_modified: updated
+# Configurable field names for field that are filled automatically
+Field name book_created: book created
+Field name book_modified: book modified

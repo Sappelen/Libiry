@@ -1,31 +1,31 @@
 ; =============================================================================
 ; Inno Setup Script for Libiry
 ; =============================================================================
-; Dit script maakt een professionele Windows installer (.exe) die:
-; - Libiry installeert in Program Files
-; - Een desktop shortcut aanmaakt
-; - Een Start Menu entry aanmaakt
-; - Een uninstaller toevoegt aan Windows "Apps & Features"
+; This script makes a professional Windows installer (.exe) that:
+; - Install Libiry in Program Files
+; - Makes a desktop shortcut
+; - Makes a Start Menu entry 
+; - Adds an uninstaller to Windows "Apps & Features"
 ;
-; Vereist: Inno Setup 6.x (gratis download: https://jrsoftware.org/isinfo.php)
-; Gebruik: Open dit bestand in Inno Setup Compiler en klik "Compile"
+; Required: Inno Setup 6.x (free download: https://jrsoftware.org/isinfo.php)
+; Use: Open this file in Inno Setup Compiler and click "Compile"
 ;
-; Waarom Inno Setup:
-; - Gratis en open source
-; - Industriestandaard voor Windows installers
-; - Maakt professionele installers zonder code signing vereiste
-; - Alternatief NSIS is complexer en minder user-friendly
+; Why Inno Setup:
+; - Free and open source
+; - Industry default for Windows installers
+; - Makes professional installers without required code signing
+; - Alternative NSIS is more complex and less user friendly
 ; =============================================================================
 
 #define MyAppName "Libiry"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "0.2.0"
 #define MyAppPublisher "Libiry"
 #define MyAppURL "https://github.com/libiry/libiry"
 #define MyAppExeName "Libiry.exe"
 
 [Setup]
-; Unieke ID voor deze applicatie (NIET WIJZIGEN na eerste release!)
-; Gegenereerd met: https://www.guidgenerator.com/
+; Unique ID for this application (DO NOT CHANGE after first release!)
+; Generated with: https://www.guidgenerator.com/
 AppId={{A7B3C8D9-E1F2-4A5B-6C7D-8E9F0A1B2C3D}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
@@ -34,22 +34,22 @@ AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
 
-; Installatie locatie
+; Installation location
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 
-; Waar de installer wordt opgeslagen
+; Where the installer is saved
 OutputDir=dist\installer
 OutputBaseFilename=LibirySetup
 
-; Compressie (lzma2 is beste balans tussen grootte en snelheid)
+; Compression (lzma2 is best balance between size and speed)
 Compression=lzma2
 SolidCompression=yes
 
-; Windows versie vereisten
+; Windows version requirements
 MinVersion=10.0
 
-; Rechten (admin voor Program Files, user voor AppData)
+; Rights (admin for Program Files, user for AppData)
 PrivilegesRequired=admin
 PrivilegesRequiredOverridesAllowed=dialog
 
@@ -57,14 +57,14 @@ PrivilegesRequiredOverridesAllowed=dialog
 WizardStyle=modern
 WizardSizePercent=100
 
-; Icon voor de installer zelf
+; Icon for the installer itself
 SetupIconFile=resources\icons\Libiry.ico
 
 ; Uninstaller
 UninstallDisplayIcon={app}\Libiry.exe
 UninstallDisplayName={#MyAppName}
 
-; Licentie en info pagina's (optioneel, uncomment indien gewenst)
+; Licence and info pages (optional)
 ; LicenseFile=LICENSE.txt
 ; InfoBeforeFile=README.txt
 
@@ -73,16 +73,16 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "dutch"; MessagesFile: "compiler:Languages\Dutch.isl"
 
 [Files]
-; Kopieer alle bestanden uit de PyInstaller dist/Libiry folder
-; Source pad is relatief aan dit .iss bestand
+; Copy all files from the PyInstaller dist/Libiry folder
+; Source path is relative to this .iss file
 Source: "dist\Libiry\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-; De customize folder moet BUITEN de app folder komen zodat users het kunnen aanpassen
-; Bij eerste installatie: kopieer defaults naar user's AppData
-Source: "customize\*"; DestDir: "{userappdata}\Libiry\customize"; Flags: ignoreversion recursesubdirs createallsubdirs onlyifdoesntexist
+; The customize folder must be placed OUTSIDE the app folder
+; First installation: copy defaults to user's AppData
+Source: "resources\*"; DestDir: "{userappdata}\Libiry\customize"; Flags: ignoreversion recursesubdirs createallsubdirs onlyifdoesntexist
 
 [Dirs]
-; Zorg dat de customize folder schrijfbaar is voor de user
+; Make sure the customize folder has the correct authorisation
 Name: "{userappdata}\Libiry"; Permissions: users-modify
 Name: "{userappdata}\Libiry\customize"; Permissions: users-modify
 
@@ -91,23 +91,23 @@ Name: "{userappdata}\Libiry\customize"; Permissions: users-modify
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 
-; Desktop shortcut (altijd aangemaakt)
+; Desktop shortcut (always created)
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 
 [Run]
-; Optie om Libiry direct te starten na installatie
+; Option to start Libiry immediately after installation
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [Registry]
-; Registreer de applicatie in Windows App Paths (maakt 'libiry' uitvoerbaar vanaf command line)
+; Register the app in Windows App Paths (makes 'libiry' executeable from command line)
 Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\{#MyAppExeName}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletekey
 
 [Code]
 // =============================================================================
-// Pascal Script voor custom installer logica
+// Pascal Script for custom installer logic
 // =============================================================================
 
-// Controleer of een eerdere versie al geinstalleerd is
+// Check if a previous version is installed already
 function InitializeSetup(): Boolean;
 var
   UninstallKey: String;
@@ -115,11 +115,10 @@ var
 begin
   Result := True;
 
-  // Check voor bestaande installatie
+  // Check for existing installation
   UninstallKey := 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{#SetupSetting("AppId")}_is1';
   if RegQueryStringValue(HKLM, UninstallKey, 'UninstallString', UninstallString) then
   begin
-    // Vraag of gebruiker wil doorgaan (oude versie wordt overschreven)
     if MsgBox('An older version of Libiry is already installed. ' +
               'Do you want to continue and update to the new version?',
               mbConfirmation, MB_YESNO) = IDNO then
