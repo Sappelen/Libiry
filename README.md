@@ -2,7 +2,7 @@ Libiry gives you an overview of all your analog, digital and audiobooks. And if 
 It works with your own book folder structure. There's no separate database.<br>
 <br>
 More information can be found on https://libiry.org<br>
-Note: Like the app itself, its documentation is also still under construction.
+Note: Like the app itself, its documentation is also still under construction.<br>
 <br>
 INSTALLATION INSTRUCTIONS<br>
 <br>
