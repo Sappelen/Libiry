@@ -19,6 +19,6 @@ python3 -m venv venv<br>
 venv/bin/pip install -r requirements.txt<br>
 ./Libiry.sh<br>
 Note: Kivy on Linux may need system packages first — if it fails, run:<br>
-sudo apt install python3-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
+sudo apt install python3-dev python3-venv libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev unrar
   Note: Kivy on Linux may need system packages first — if it fails, run:
   sudo apt install python3-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
