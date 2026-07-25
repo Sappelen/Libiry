@@ -36,5 +36,6 @@ update-desktop-database ~/.local/share/applications/<br>
 <br>
 6. Launch:<br>
 libiry<br>
+END OF FILE
 
   sudo apt install python3-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
