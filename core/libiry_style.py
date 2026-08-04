@@ -72,9 +72,24 @@ def get_user_data_dir() -> Path:
     elif sys.platform == 'darwin':
         base = Path.home() / 'Library' / 'Application Support'
     else:
-        xdg = os.environ.get('XDG_DATA_HOME', '')
-        base = Path(xdg) if xdg else Path.home() / '.local' / 'share'
+        xdg = os.environ.get('XDG_CONFIG_HOME', '')
+        base = Path(xdg) if xdg else Path.home() / '.config'
     return base / 'Libiry'
+    
+def get_cache_dir() -> Path:
+    """Platform-specific cache directory for Libiry
+    Windows: %LOCALAPPDATA%\Libiry\cache
+    macOS:   ~/Library/Caches/Libiry
+    Linux:   $XDG_CACHE_HOME/Libiry or ~/.cache/Libiry"""
+    if sys.platform == 'win32':
+        base = Path(os.environ.get('LOCALAPPDATA', str(Path.home() / 'AppData' / 'Local')))
+        return base / 'Libiry' / 'cache'
+    elif sys.platform == 'darwin':
+        return Path.home() / 'Library' / 'Caches' / 'Libiry'
+    else:
+        xdg = os.environ.get('XDG_CACHE_HOME', '')
+        base = Path(xdg) if xdg else Path.home() / '.cache'
+        return base / 'Libiry'    
 
 def get_customize_dirs() -> list:
     """Customize directories in priority order: user data first, app dir as dev/portable fallback
@@ -890,7 +905,7 @@ class  LibiryKivyApp(App):
         super().__init__(**kwargs)
         self._current_folder = None
         self._settings_inputs = {}
-        settings_dir = Path.home() / ".libiry"
+        settings_dir = get_user_data_dir()
         settings_dir.mkdir(parents=True, exist_ok=True)
         self.store = JsonStore(str(settings_dir / "settings.json"))
         self._load_style()
@@ -983,7 +998,27 @@ class  LibiryKivyApp(App):
 
         return settings
 
+    def _seed_customize_dir(self):
+        """Copy everything from the resources folder into the user customize dir on first run. Triggered when subfolder icons is absent. Only copies files that do not exist yet"""
+        import shutil
+        user_customize = get_user_data_dir() / 'customize'
+        if (user_customize / 'icons').exists():
+            return
+        src = get_script_dir() / 'resources'
+        if not src.exists():
+            return
+        try:
+            for src_file in src.rglob('*'):
+                if src_file.is_file():
+                    dst_file = user_customize / src_file.relative_to(src)
+                    if not dst_file.exists():
+                        dst_file.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(src_file, dst_file)
+        except Exception as e:
+            print(f"Warning: could not seed customize dir: {e}")
+
     def _load_style(self):
+        self._seed_customize_dir()
         try:
             self.custom = self._load_customization()
         except Exception:
@@ -1512,10 +1547,10 @@ class  LibiryKivyApp(App):
         return self._build_ui()
 
     def _build_ui(self):
-        """Create root BoxLayout and populate it via _create_widgets()"""
+        """Create root BoxLayout and populate it via _create_widgets(). Note the Title Bar is displayey higher in Windows then in Linux"""
         from kivy.uix.boxlayout import BoxLayout
 
-        layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
+        layout = BoxLayout(orientation='vertical', padding=[20, 36, 20, 20], spacing=10) #[left, top, right, bottom] — top goes from 20 to 36dp (one title line height). The extra 16dp shifts everything down just enough on Linux without being noticeable on Windows
         self._layout = layout
         self._create_widgets()
         return layout

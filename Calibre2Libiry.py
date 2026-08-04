@@ -34,7 +34,7 @@ except (ImportError, AttributeError, OSError):
   
 from version import __version__  
 from kivy.config import Config
-_icon_path = Path(__file__).parent / "resources" / "icons" / "Libiry.ico"
+_icon_path = Path(__file__).parent / "resources" / "icons" / "Libiry.png"
 if _icon_path.exists():
     Config.set('kivy', 'window_icon', str(_icon_path).replace('\\', '/'))
     Config.set('input', 'mouse', 'mouse,multitouch_on_demand')
@@ -307,8 +307,8 @@ class Calibre2LibiryApp(LibiryKivyApp):
             return None
         opf_count, cover_count = count_files_to_execute(folder_path)
         if opf_count + cover_count == 0:
-            self._show_error(
-                "No metadata.opf files or standalone covers found.")
+            self._show_info('Information',
+                "No metadata.opf files or standalone covers were found in this folder")
             return None
         return folder_path
 

@@ -1,8 +1,8 @@
 #!/bin/bash
 # Libiry Cache Cleaner - Linux/macOS
-# Verwijdert de Libiry cache folder (~/.libiry/cache)
+# Removes the Libiry cache folder
 
-CACHE_DIR="$HOME/.libiry/cache"
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/Libiry"
 
 if [ -d "$CACHE_DIR" ]; then
     echo "Clearing Libiry cache: $CACHE_DIR"

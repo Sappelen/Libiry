@@ -1,8 +1,8 @@
 @echo off
 REM Libiry Cache Cleaner - Windows
-REM Verwijdert de Libiry cache folder (~/.libiry/cache)
+REM Removes the Libiry cache folder
 
-set CACHE_DIR=%USERPROFILE%\.libiry\cache
+set CACHE_DIR=%LOCALAPPDATA%\Libiry\cache
 
 if exist "%CACHE_DIR%" (
     echo Clearing Libiry cache: %CACHE_DIR%

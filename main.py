@@ -33,7 +33,7 @@ from kivy.config import Config
 
 # Set window icon before importing other kivy modules
 app_path = Path(__file__).parent
-icon_path = app_path / "resources" / "icons" / "Libiry.ico"
+icon_path = app_path / "resources" / "icons" / "Libiry.png"
 if icon_path.exists():
     # Use forward slashes for Kivy config
     Config.set('kivy', 'window_icon', str(icon_path).replace('\\', '/'))
@@ -66,7 +66,7 @@ from core.cover_extractor import CoverExtractor
 from core.file_opener import open_in_default_app
 from core.file_cache import FileCache
 from core.metadata_extractor import BookMetadata, get_sidecar_path, modify_markdown_tags, modify_epub_tags, modify_cbz_tags, save_full_metadata
-from core.libiry_style import draw_capsule_bar, get_icon_path, get_user_data_dir, is_hidden, HoverBehavior, ColoredButton, LocationBox, SearchBox, StyledCheckBox, measure_text_size
+from core.libiry_style import draw_capsule_bar, get_icon_path, get_user_data_dir, get_cache_dir, is_hidden, HoverBehavior, ColoredButton, LocationBox, SearchBox, StyledCheckBox, measure_text_size
 
 class ImageButton(HoverBehavior, ButtonBehavior, Image):
     """A button with an image. Supports hover tooltips via the tooltip_text property"""
@@ -501,8 +501,8 @@ class LibiryApp(LibiryKivyApp):
     current_path = StringProperty('')
     status_text = StringProperty('Select a folder to browse')
 
-    CACHE_DIR = Path.home() / ".libiry" / "cache"
-
+    CACHE_DIR = get_cache_dir()
+    
     ZOOM_LEVELS = [
         (dp(100), dp(150)),
         (dp(150), dp(225)),
@@ -4041,7 +4041,7 @@ class LibiryApp(LibiryKivyApp):
         """Save zoom level to settings.json and current folder to customize.txt
         Note: This is APART from _save_settings() that saves customize.txt completely and also saves and selected types.txt"""
         try:
-            Path.home().joinpath(".libiry").mkdir(parents=True, exist_ok=True)
+            get_user_data_dir().mkdir(parents=True, exist_ok=True)
             self.store.put('zoom_level', value=self._zoom_level)
         except Exception as e:
             print(f"Error saving session state: {e}")
@@ -4094,9 +4094,8 @@ class LibiryApp(LibiryKivyApp):
 
 def clear_cache():
     """Clear the entire Libiry cache folder
-    Gets called in case of startup issues to remove corrupt cache
-    """
-    cache_dir = Path.home() / '.libiry' / 'cache'
+    Gets called in case of startup issues to remove corrupt cache"""
+    cache_dir = get_cache_dir()
     if cache_dir.exists():
         try:
             shutil.rmtree(cache_dir)

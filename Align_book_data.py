@@ -20,7 +20,7 @@ except (ImportError, AttributeError, OSError):
     pass
 from version import __version__
 from kivy.config import Config
-_icon_path = Path(__file__).parent / "resources" / "icons" / "Libiry.ico"
+_icon_path = Path(__file__).parent / "resources" / "icons" / "Libiry.png"
 if _icon_path.exists():
     Config.set('kivy', 'window_icon', str(_icon_path).replace('\\', '/'))
     Config.set('input', 'mouse', 'mouse,multitouch_on_demand')

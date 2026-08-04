@@ -1,68 +1,72 @@
-#!/bin/bash
-# =============================================================================
-# Libiry Linux installatie script (voor development/source)
-# =============================================================================
-# Dit script installeert dependencies om Libiry vanaf broncode te draaien.
-# Voor eindgebruikers is de AppImage eenvoudiger.
-#
-# Gebruik: ./install.sh
-# =============================================================================
-
+#!/usr/bin/env bash
+# Libiry installer for Debian/Ubuntu-based Linux systems
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+INSTALL_DIR="/opt/Libiry"
+REPO_URL="https://github.com/Sappelen/Libiry.git"
+BIN_LINK="/usr/local/bin/libiry"
+DESKTOP_DIR="$HOME/.local/share/applications"
 
-echo "========================================"
-echo "  Libiry Linux Installatie"
-echo "========================================"
-echo ""
+echo "==============================="
+echo "  Libiry Installation"
+echo "==============================="
+echo
 
-# Check Python
-PYTHON_CMD=""
-for cmd in python3.11 python3.10 python3; do
-    if command -v $cmd &> /dev/null; then
-        PYTHON_CMD=$cmd
-        break
-    fi
-done
-
-if [ -z "$PYTHON_CMD" ]; then
-    echo "FOUT: Python 3.10+ is vereist"
-    echo ""
-    echo "Installeer met:"
-    echo "  Ubuntu/Debian: sudo apt install python3 python3-venv python3-pip"
-    echo "  Fedora:        sudo dnf install python3 python3-pip"
-    echo "  Arch:          sudo pacman -S python python-pip"
+# Check Python 3
+if ! command -v python3 &>/dev/null; then
+    echo "ERROR: Python 3 is not installed. Please install Python 3.11 or 3.12."
     exit 1
 fi
+echo "Found $(python3 --version)"
 
-echo "Python gevonden: $PYTHON_CMD"
-echo ""
+# System dependencies
+echo
+echo "[1/5] Installing system dependencies..."
+sudo apt-get install -y \
+    python3-dev python3-venv git \
+    libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
+    unrar
 
-# Maak venv aan
-cd "$PROJECT_ROOT"
-if [ ! -d "venv" ]; then
-    echo ">> Virtual environment aanmaken..."
-    $PYTHON_CMD -m venv venv
+# Clone or update
+echo
+echo "[2/5] Downloading Libiry..."
+if [ -d "$INSTALL_DIR/.git" ]; then
+    echo "Existing installation found — updating..."
+    git -C "$INSTALL_DIR" pull origin master
+else
+    sudo git clone "$REPO_URL" "$INSTALL_DIR"
+    sudo chown -R "$USER:$USER" "$INSTALL_DIR"
 fi
 
-# Activeer venv
-source venv/bin/activate
+# Python environment
+echo
+echo "[3/5] Setting up Python environment..."
+cd "$INSTALL_DIR"
+python3 -m venv venv
+venv/bin/pip install --upgrade pip --quiet
+venv/bin/pip install -r requirements.txt --quiet
 
-# Upgrade pip
-echo ">> Pip upgraden..."
-pip install --upgrade pip
+# Command-line launcher
+echo
+echo "[4/5] Installing command-line launcher..."
+sudo ln -sf "$INSTALL_DIR/Libiry.sh" "$BIN_LINK"
+# Desktop entry + icon
+echo
+echo "[5/5] Installing desktop entry..."
+mkdir -p "$DESKTOP_DIR"
+sed "s|Exec=Libiry|Exec=$INSTALL_DIR/Libiry.sh|" \
+    "$INSTALL_DIR/linux/Libiry.desktop" \
+    > "$DESKTOP_DIR/Libiry.desktop"
+if [ -f "$INSTALL_DIR/resources/icons/Libiry.png" ]; then
+    sudo cp "$INSTALL_DIR/resources/icons/Libiry.png" /usr/share/pixmaps/libiry.png
+fi
+update-desktop-database "$DESKTOP_DIR" 2>/dev/null || true
 
-# Installeer dependencies
-echo ""
-echo ">> Dependencies installeren..."
-pip install -r requirements.txt
-
-echo ""
-echo "========================================"
-echo "  Installatie voltooid!"
-echo "========================================"
-echo ""
-echo "Libiry starten met: ./run.sh"
-echo ""
+echo
+echo "==============================="
+echo "  Installation complete!"
+echo "==============================="
+echo
+echo "Launch from terminal:  libiry"
+echo "Or find Libiry in your applications menu."
+echo
