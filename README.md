@@ -11,6 +11,7 @@ git clone https://github.com/sappelen/Libiry.git "C:\Program Files\Libiry"<br>
 cd "C:\Program Files\Libiry"<br>
 install.bat<br>
 Libiry.bat<br>
+Alternatively, use %LOCALAPPDATA%\Programs instead of C:\Program Files  (no admin rights needed).<br>
 <br>
 Linux:<br>
 curl -O https://raw.githubusercontent.com/sappelen/Libiry/master/linux/install.sh<br>
