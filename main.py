@@ -2,6 +2,9 @@
 Supports Windows, Linux, macOS, Android and iOS"""
 
 import sys
+if sys.platform != 'win32':
+      os.environ.setdefault('SDL_VIDEO_X11_WMCLASS', 'Libiry')
+      os.environ.setdefault('SDL_VIDEO_WAYLAND_WMCLASS', 'Libiry')
 import re
 import shutil
 import os
@@ -27,6 +30,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 if sys.platform == 'win32':
     import ctypes
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('libiry.app.1.0')
+
+if sys.platform != 'win32':
+    os.environ.setdefault('SDL_VIDEO_X11_WMCLASS', 'Libiry')
+    os.environ.setdefault('SDL_VIDEO_WAYLAND_WMCLASS', 'Libiry')
 
 from version import __version__
 from kivy.config import Config
@@ -837,7 +844,9 @@ class LibiryApp(LibiryKivyApp):
         add_spacer()
 
         # 6. Twins filter button (rightmost) - 100% size
-        twins_icon = get_icon_path(self._app_path, 'twins.png')
+        # Note that the icon does not display properly on Linux!
+        # Because 5 thin lines in a 542×659 illustration don't survive aggressive downscaling on Linux's OpenGL driver
+        twins_icon = get_icon_path(self._app_path, 'twins.png')       
         if twins_icon:
             self.btn_twins = ImageButton(source=twins_icon, size_hint=(None, None), size=(icon_size, icon_size))
             self.btn_twins.tooltip_text = 'Find duplicates'

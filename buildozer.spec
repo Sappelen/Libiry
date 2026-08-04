@@ -16,7 +16,7 @@ source.dir = .
 source.include_exts = py,png,jpg,jpeg,ico,json
 
 # Application versioning
-version = 1.0.0
+version = 0.4.0
 
 # Application requirements
 requirements = python3,kivy,pillow,sqlite3

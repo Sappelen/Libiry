@@ -1078,15 +1078,15 @@ class  LibiryKivyApp(App):
             if loc.exists() and loc.is_dir():
                 start_path = loc
 
-        # Step 3: Fallback to current work directory
+        # Step 3: Fallback to Home
         if not start_path:
-            cwd = Path.cwd()
+            cwd = Path.home()
             if cwd.exists() and cwd.is_dir():
                 start_path = cwd
 
         # Step 4: if the chosen path does not exist (anymore), use current work directory
         if start_path and not start_path.exists():
-            start_path = Path.cwd()
+            start_path = Path.home()
 
         try:
             if self.store.exists('zoom_level'):

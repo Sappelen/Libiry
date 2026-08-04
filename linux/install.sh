@@ -59,7 +59,10 @@ sed "s|Exec=Libiry|Exec=$INSTALL_DIR/Libiry.sh|" \
     > "$DESKTOP_DIR/Libiry.desktop"
 if [ -f "$INSTALL_DIR/resources/icons/Libiry.png" ]; then
     sudo cp "$INSTALL_DIR/resources/icons/Libiry.png" /usr/share/pixmaps/libiry.png
+    mkdir -p "$HOME/.local/share/icons/hicolor/256x256/apps"
+    cp "$INSTALL_DIR/resources/icons/Libiry.png" "$HOME/.local/share/icons/hicolor/256x256/apps/libiry.png"
 fi
+
 update-desktop-database "$DESKTOP_DIR" 2>/dev/null || true
 
 echo
