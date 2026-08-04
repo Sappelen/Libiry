@@ -7,12 +7,16 @@ Note: Like the app itself, its documentation is also still under construction.<b
 INSTALL INSTRUCTIONS<br>
 <br>
 Windows:<br>
-git clone https://github.com/sappelen/Libiry.git<br>
-cd Libiry<br>
+git clone https://github.com/sappelen/Libiry.git "C:\Program Files\Libiry"<br>
+cd "C:\Program Files\Libiry"<br>
 install.bat<br>
 Libiry.bat<br>
 <br>
 Linux:<br>
+curl -O https://raw.githubusercontent.com/sappelen/Libiry/master/linux/install.sh<br>
+chmod +x install.sh<br>
+./install.sh<br>
+or, for development purposes:<br>
 git clone https://github.com/sappelen/Libiry.git<br>
 cd Libiry<br>
 chmod +x linux/install.sh<br>
