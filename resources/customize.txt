@@ -12,7 +12,7 @@ Store metadata in sidecar: N
 Scrollbar width: 20
 Scrollbar always visible: Y
 Show book title: Y
-Show tags: N
+Show tags: Y
 Font size: 12
 Tag number: 100
 

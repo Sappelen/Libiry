@@ -2,9 +2,6 @@
 Supports Windows, Linux, macOS, Android and iOS"""
 
 import sys
-if sys.platform != 'win32':
-      os.environ.setdefault('SDL_VIDEO_X11_WMCLASS', 'Libiry')
-      os.environ.setdefault('SDL_VIDEO_WAYLAND_WMCLASS', 'Libiry')
 import re
 import shutil
 import os

@@ -33,6 +33,7 @@ fi
 
 # Icon
 [ -f /usr/share/pixmaps/libiry.png ] && sudo rm /usr/share/pixmaps/libiry.png
+[ -f "$HOME/.local/share/icons/hicolor/256x256/apps/libiry.png" ] && rm "$HOME/.local/share/icons/hicolor/256x256/apps/libiry.png" && echo "Removed user icon"
 
 echo
 read -rp "Also remove your settings and customizations for Libiry in $CONFIG_DIR? (y/N) " rc

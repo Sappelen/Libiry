@@ -1176,7 +1176,7 @@ class  LibiryKivyApp(App):
             start = str(self._current_folder)
         else:
             loc = self.custom.get('location', '')
-            start = loc if loc and Path(loc).is_dir() else str(Path.cwd())
+            start = loc if loc and Path(loc).is_dir() else str(Path.home())
         self._show_folder_chooser_popup(start, 'Select folder',
                                         lambda p: self.navigate_to(Path(p)))
 
@@ -1390,7 +1390,7 @@ class  LibiryKivyApp(App):
         inner_container.add_widget(text_input)
 
         def on_browse(instance):
-            start = text_input.text.strip() or str(Path.cwd())
+            start = text_input.text.strip() or str(Path.home())
             self._show_folder_chooser_popup(
             start,
             f"Choose {label_text.lower()}",

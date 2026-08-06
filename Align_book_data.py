@@ -372,7 +372,7 @@ class AlignBookDataApp(LibiryKivyApp):
         removed_paths = []
  
         # Look for all .md sidecar files. Note that this logic is much more precise than the logic in libiry_style.py/is_hidden
-        for md_file in folder_path.rglob('*.md'):
+        for md_file in list(folder_path.rglob('*.md')):
 
             # Check if this file is hidden or in a hidden folder
             rel_parts = md_file.relative_to(folder_path).parts

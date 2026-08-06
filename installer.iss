@@ -18,7 +18,7 @@
 ; =============================================================================
 
 #define MyAppName "Libiry"
-#define MyAppVersion "0.4.0"
+#define MyAppVersion "0.5.0"
 #define MyAppPublisher "Libiry"
 #define MyAppURL "https://github.com/libiry/libiry"
 #define MyAppExeName "Libiry.exe"
