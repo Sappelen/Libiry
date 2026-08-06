@@ -2,17 +2,17 @@
 # =============================================================================
 # PyInstaller spec file for Libiry
 # =============================================================================
-# Dit bestand configureert PyInstaller om Libiry te bundelen naar een
-# standalone executable. PyInstaller analyseert de imports en bundelt
-# Python + alle dependencies in één folder of één executable.
+# This file configures PyInstaller to bundle Library into a
+# standalone executable. PyInstaller analyzes the imports and bundles
+# Python + all dependencies into one folder or one executable.
 #
-# Waarom deze aanpak:
-# - onefile=False: Kivy werkt beter met folder-mode vanwege de vele DLLs
-# - Tree() voor resources: behoud mapstructuur van icons en configs
-# - Hidden imports: sommige Kivy/PIL modules worden niet automatisch gevonden
+# Why this approach:
+# - onefile=False: Kivy works better in folder mode because of the many DLLs
+# - Tree() for resources: preserves the folder structure of icons and configs
+# - Hidden imports: some Kivy/PIL modules are not found automatically
 #
-# Gebruik: pyinstaller libiry.spec
-# =============================================================================
+# Usage: pyinstaller libiry.spec
+#=============================================================================
 
 import os
 import sys
@@ -21,14 +21,14 @@ from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 
 block_cipher = None
 
-# Pad naar project root (waar dit spec bestand staat)
+# Path to project root (where this file sits)
 SPEC_ROOT = os.path.dirname(os.path.abspath(SPEC))
 
-# Hidden imports voor Kivy en PIL
-# Let op: collect_submodules('kivy') faalt op kivy.garden (namespace package)
-# Daarom specifieke modules die runtime nodig zijn handmatig toevoegen
+# Hidden imports for Kivy en PIL
+# Beware: collect_submodules('kivy') fails on kivy.garden (namespace package)
+# Therefore manual addition of specific modules needed at runtime
 hiddenimports = [
-    # Kivy core modules die dynamisch worden geladen
+    # Kivy core modules dynamically loaded
     'kivy.core.window',
     'kivy.core.text',
     'kivy.core.image',
@@ -49,7 +49,7 @@ hiddenimports = [
     'send2trash',
 ]
 
-# Voeg Kivy uix modules toe (widgets)
+# Add Kivy uix modules (widgets)
 kivy_uix = [
     'kivy.uix.label', 'kivy.uix.button', 'kivy.uix.textinput',
     'kivy.uix.boxlayout', 'kivy.uix.gridlayout', 'kivy.uix.scrollview',
@@ -61,7 +61,7 @@ kivy_uix = [
 ]
 hiddenimports += kivy_uix
 
-# Data files die meegebundeld moeten worden
+# Data files that must be bundled too
 # Format: (source_path, destination_folder)
 datas = [
     (os.path.join(SPEC_ROOT, 'resources'), 'resources'),
@@ -69,7 +69,7 @@ datas = [
     (os.path.join(SPEC_ROOT, 'about.txt'), '.'),
 ]
 
-# Verzamel Kivy data files (fonts, images, etc)
+# Collect Kivy data files (fonts, images, etc)
 datas += collect_data_files('kivy')
 
 a = Analysis(
@@ -82,11 +82,11 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        # Excludes om bestandsgrootte te beperken
-        'tkinter',      # Niet nodig, we gebruiken Kivy
-        'matplotlib',   # Niet nodig
-        'numpy.tests',  # Test files niet nodig
-        'scipy',        # Niet nodig
+        # Excludes to limit file size
+        'tkinter',      # No need, we use Kivy
+        'matplotlib',   # No need
+        'numpy.tests',  # Test files, no need
+        'scipy',        # No need
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
@@ -100,13 +100,13 @@ exe = EXE(
     pyz,
     a.scripts,
     [],
-    exclude_binaries=True,  # True = folder mode (aanbevolen voor Kivy)
+    exclude_binaries=True,  # True = folder mode (recommended for Kivy)
     name='Libiry',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,  # Compressie voor kleinere bestanden
-    console=False,  # False = geen console window (GUI app)
+    upx=True,  # Compression for smaller files
+    console=False,  # False = no console window (GUI app)
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
