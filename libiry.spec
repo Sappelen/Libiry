@@ -65,7 +65,6 @@ hiddenimports += kivy_uix
 # Format: (source_path, destination_folder)
 datas = [
     (os.path.join(SPEC_ROOT, 'resources'), 'resources'),
-    (os.path.join(SPEC_ROOT, 'customize'), 'customize'),
     (os.path.join(SPEC_ROOT, 'about.txt'), '.'),
 ]
 

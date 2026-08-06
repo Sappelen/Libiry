@@ -18,14 +18,38 @@ block_cipher = None
 
 SPEC_ROOT = os.path.dirname(os.path.abspath(SPEC))
 
-hiddenimports = collect_submodules('kivy')
-hiddenimports += collect_submodules('PIL')
+hiddenimports = [
+      'kivy.core.window',
+      'kivy.core.text',
+      'kivy.core.image',
+      'kivy.core.clipboard',
+      'kivy.core.audio',
+      'kivy.core.spelling',
+      'kivy.graphics.cgl',
+      'PIL.Image',
+      'PIL.ImageDraw',
+      'PIL.ImageFont',
+      'ebookmeta',
+      'mobi',
+      'fitz',
+      'send2trash',
+  ]
 
-datas = [
-    (os.path.join(SPEC_ROOT, 'resources'), 'resources'),
-    (os.path.join(SPEC_ROOT, 'customize'), 'customize'),
-    (os.path.join(SPEC_ROOT, 'about.txt'), '.'),
-]
+  kivy_uix = [
+      'kivy.uix.label', 'kivy.uix.button', 'kivy.uix.textinput',
+      'kivy.uix.boxlayout', 'kivy.uix.gridlayout', 'kivy.uix.scrollview',
+      'kivy.uix.image', 'kivy.uix.popup', 'kivy.uix.filechooser',
+      'kivy.uix.checkbox', 'kivy.uix.slider', 'kivy.uix.spinner',
+      'kivy.uix.widget', 'kivy.uix.floatlayout', 'kivy.uix.relativelayout',
+      'kivy.uix.anchorlayout', 'kivy.uix.stacklayout', 'kivy.uix.scatter',
+      'kivy.uix.behaviors', 'kivy.uix.recycleview',
+  ]
+  hiddenimports += kivy_uix
+
+  datas = [
+      (os.path.join(SPEC_ROOT, 'resources'), 'resources'),
+      (os.path.join(SPEC_ROOT, 'about.txt'), '.'),
+  ]
 
 datas += collect_data_files('kivy')
 

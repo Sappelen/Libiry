@@ -1,16 +1,17 @@
+====================================================================================
+# GitHub Actions Workflow - Build and Release Library
 # =============================================================================
-# GitHub Actions Workflow - Build and Release Libiry
-# =============================================================================
-# Dit workflow wordt automatisch uitgevoerd wanneer:
-# 1. Een nieuwe tag wordt gepusht (v*.*.*)
-# 2. Handmatig via GitHub Actions interface (workflow_dispatch)
+# This workflow runs automatically when:
+# 1. A new tag is pushed (v*.*.*)
+# 2. Manually via the GitHub Actions interface (workflow_dispatch)
 #
-# Het bouwt installers voor alle drie de platforms en publiceert ze als
-# GitHub Release downloads, net zoals GIMP en andere populaire software.
+# It builds installers for all three platforms and publishes them as
+# GitHub Release downloads, just like GIMP and other popular software.
+
 #
-# Hoe te gebruiken:
-# 1. Push een tag: git tag v1.0.0 && git push origin v1.0.0
-# 2. Of: ga naar Actions > Build Release > Run workflow
+# How to use:
+# 1. Push a tag: git tag v1.0.0 && git push origin v1.0.0
+# 2. Or: go to Actions > Build Release > Run workflow
 # =============================================================================
 
 name: Build Release
@@ -18,15 +19,15 @@ name: Build Release
 on:
   push:
     tags:
-      - 'v*.*.*'  # Triggered bij version tags zoals v1.0.0, v1.2.3
-  workflow_dispatch:  # Handmatig starten mogelijk
+      - 'v*.*.*'  # Triggered for version tags like v1.0.0, v1.2.3
+  workflow_dispatch:  # Manual starten possible
     inputs:
       version:
         description: 'Version number (e.g., 1.0.0)'
         required: true
         default: '1.0.0'
 
-# Voorkom dat meerdere builds tegelijk lopen
+# Prevent several builds running simultaneously
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: true
@@ -186,7 +187,7 @@ jobs:
 
       - name: Build with PyInstaller
         run: |
-          pyinstaller --clean --noconfirm libiry_macos.spec
+          pyinstaller --clean --noconfirm linux/libiry.spec
 
       - name: Download appimagetool
         run: |
