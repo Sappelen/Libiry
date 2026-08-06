@@ -58,8 +58,11 @@ jobs:
           pip install -r requirements.txt
 
       - name: Build with PyInstaller
+        env:
+          SDL_VIDEODRIVER: dummy
+          KIVY_NO_ENV_CONFIG: '1'
         run: |
-          pyinstaller --clean --noconfirm libiry.spec
+          pyinstaller --clean --noconfirm libiry.spec   
 
       - name: Install Inno Setup
         run: |
@@ -129,8 +132,12 @@ jobs:
           iconutil -c icns "resources/icons/Libiry.iconset" -o "resources/icons/Libiry.icns"
 
       - name: Build with PyInstaller
+        env:
+          SDL_VIDEODRIVER: dummy
+          KIVY_NO_ENV_CONFIG: '1'
         run: |
           pyinstaller --clean --noconfirm libiry_macos.spec
+
 
       - name: Create DMG
         run: |
@@ -186,6 +193,9 @@ jobs:
           pip install -r requirements.txt
 
       - name: Build with PyInstaller
+        env:
+          SDL_VIDEODRIVER: dummy
+          KIVY_NO_ENV_CONFIG: '1'
         run: |
           pyinstaller --clean --noconfirm linux/libiry.spec
 
@@ -243,8 +253,8 @@ jobs:
           chmod +x "$APPDIR/AppRun"
 
           # Build AppImage
-          ./appimagetool-x86_64.AppImage --appimage-extract-and-run "$APPDIR" dist/installer/Libiry-x86_64.AppImage
-
+          ARCH=x86_64 ./appimagetool-x86_64.AppImage --appimage-extract-and-run "$APPDIR" dist/installer/Libiry-x86_64.AppImage
+  
       - name: Upload Linux Installer
         uses: actions/upload-artifact@v4
         with:
