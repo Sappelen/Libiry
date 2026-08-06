@@ -1,22 +1,22 @@
 #!/bin/bash
 # =============================================================================
-# Build script voor macOS - maakt Libiry.app en .dmg installer
+# Build script for macOS - makes Libiry.app and .dmg installer
 # =============================================================================
-# Dit script:
-# 1. Installeert build dependencies
-# 2. Converteert icon naar .icns format
-# 3. Bouwt de .app bundle met PyInstaller
-# 4. Maakt een .dmg disk image voor distributie
+# This script:
+# 1. Installs build dependencies
+# 2. Converts icon to .icns format
+# 3. Builds the .app bundle with PyInstaller
+# 4. Creates a .dmg disk image for distribution
 #
-# Vereisten:
-# - macOS 10.15+ (Catalina of nieuwer)
-# - Python 3.10+ (via Homebrew aanbevolen)
+# Requirements:
+# - macOS 10.15+ (Catalina or newer)
+# - Python 3.10+ (via Homebrew recommended)
 # - Xcode Command Line Tools: xcode-select --install
 #
-# Gebruik: ./build_macos.sh (vanuit de Libiry folder)
+# Use: ./build_macos.sh (from the Libiry folder)
 # =============================================================================
 
-set -e  # Stop bij eerste error
+set -e  # Stops at first error
 
 echo ""
 echo "========================================"
@@ -24,20 +24,20 @@ echo "  Libiry macOS Build Script"
 echo "========================================"
 echo ""
 
-# Controleer of we in de juiste folder zijn
+# Check if we are in the correct folder
 if [ ! -f "main.py" ]; then
-    echo "ERROR: main.py niet gevonden. Run dit script vanuit de Libiry folder."
+    echo "ERROR: main.py not found. Run this script from the Libiry folder."
     exit 1
 fi
 
-# Controleer Python versie
+# Check Python version
 PYTHON_VERSION=$(python3 --version 2>&1 | cut -d' ' -f2 | cut -d'.' -f1,2)
 echo "Python version: $PYTHON_VERSION"
 
-# Maak dist folder
+# Make dist folder
 mkdir -p dist/installer
 
-# Activeer venv als die bestaat
+# Activate venv if it exists
 if [ -d "venv" ]; then
     echo "Activating virtual environment..."
     source venv/bin/activate
@@ -47,18 +47,18 @@ else
     source venv/bin/activate
 fi
 
-# Installeer build tools
+# Install build tools
 echo ""
 echo "[1/5] Installing build dependencies..."
 pip install --upgrade pip
 pip install --upgrade pyinstaller
 
-# Installeer app dependencies
+# Install app dependencies
 echo ""
 echo "[2/5] Installing app dependencies..."
 pip install -r requirements.txt
 
-# Converteer icon naar .icns format (macOS native icon formaat)
+# Convert icon to .icns format (macOS native icon format)
 echo ""
 echo "[3/5] Converting icon to macOS format..."
 
@@ -70,11 +70,11 @@ if [ -f "$ICON_SRC" ] && [ ! -f "$ICON_DST" ]; then
     ICONSET="resources/icons/Libiry.iconset"
     mkdir -p "$ICONSET"
 
-    # Gebruik sips (macOS native tool) om PNG te extraheren en te resizen
-    # Eerst converteren naar PNG
+    # Use sips (macOS native tool) to extract and resize PNG
+    # Convert to PNG first
     sips -s format png "$ICON_SRC" --out "$ICONSET/icon_512x512.png" 2>/dev/null || true
 
-    # Als sips niet werkt (ico formaat), probeer met Python/PIL
+    # If sips doesn't work (ico format), try with Python/PIL
     if [ ! -f "$ICONSET/icon_512x512.png" ]; then
         python3 << 'PYTHON_SCRIPT'
 from PIL import Image
@@ -84,11 +84,11 @@ ico_path = "resources/icons/Libiry.ico"
 iconset_path = "resources/icons/Libiry.iconset"
 os.makedirs(iconset_path, exist_ok=True)
 
-# Open ico en pak grootste resolutie
+# Open ico and get biggest resolution
 img = Image.open(ico_path)
 img = img.convert('RGBA')
 
-# Genereer alle benodigde groottes voor macOS
+# Generate all sizes needed for macOS
 sizes = [16, 32, 64, 128, 256, 512, 1024]
 for size in sizes:
     resized = img.resize((size, size), Image.Resampling.LANCZOS)
@@ -107,19 +107,18 @@ print("Icon sizes generated successfully")
 PYTHON_SCRIPT
     fi
 
-    # Converteer iconset naar icns
+    # Convert iconset to icns
     if [ -d "$ICONSET" ]; then
         iconutil -c icns "$ICONSET" -o "$ICON_DST" 2>/dev/null || echo "Warning: iconutil failed, continuing without custom icon"
         rm -rf "$ICONSET"
     fi
 fi
 
-# Bouw met PyInstaller
+# Build with PyInstaller
 echo ""
 echo "[4/5] Building .app bundle with PyInstaller..."
 echo "This may take several minutes..."
-
-pyinstaller --clean --noconfirm libiry_macos.spec
+pyinstaller --clean --noconfirm linux/libiry.spec
 
 if [ ! -d "dist/Libiry.app" ]; then
     echo ""
@@ -137,22 +136,22 @@ echo "[5/5] Creating DMG installer..."
 DMG_NAME="Libiry-Installer.dmg"
 DMG_PATH="dist/installer/$DMG_NAME"
 
-# Verwijder oude DMG als die bestaat
+# Delete old DMG if there is one
 rm -f "$DMG_PATH"
 
-# Maak een tijdelijke folder voor de DMG inhoud
+# Make temp folder 
 DMG_TEMP="dist/dmg_temp"
 rm -rf "$DMG_TEMP"
 mkdir -p "$DMG_TEMP"
 
-# Kopieer de app
+# Copy the app
 cp -R "dist/Libiry.app" "$DMG_TEMP/"
 
-# Maak een symbolic link naar Applications (standaard macOS installer patroon)
+# Make a symbolic link to Applications (standard macOS installer pattern)
 ln -s /Applications "$DMG_TEMP/Applications"
 
-# Maak de DMG
-# hdiutil is de macOS native tool voor disk images
+# Make the DMG
+# hdiutil is the macOS native tool for disk images
 hdiutil create -volname "Libiry" \
     -srcfolder "$DMG_TEMP" \
     -ov -format UDZO \

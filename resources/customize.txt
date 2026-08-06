@@ -14,7 +14,7 @@ Scrollbar always visible: Y
 Show book title: Y
 Show tags: Y
 Font size: 12
-Tag number: 100
+Tag lines: 10
 
 # Configurable field names (sequence based on Goodreads CSV export)
 Field name cover: cover

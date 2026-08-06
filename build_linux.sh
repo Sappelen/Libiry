@@ -1,27 +1,30 @@
 #!/bin/bash
 # =============================================================================
-# Build script voor Linux - maakt AppImage
+# Build script for Linux - makes AppImage
 # =============================================================================
-# Dit script:
-# 1. Installeert build dependencies
-# 2. Bouwt de executable met PyInstaller
-# 3. Maakt een AppImage voor universele Linux distributie
+# This script:
+
+# 1. Installs build dependencies
+# 2. Builds the executable with PyInstaller
+# 3. Creates an AppImage for universal Linux distribution
 #
-# Waarom AppImage:
-# - Werkt op alle Linux distributies (Ubuntu, Fedora, Arch, etc.)
-# - Geen root rechten nodig voor installatie
-# - Eén bestand, download en run
-# - Alternatief: .deb/.rpm zijn distro-specifiek
+
+# Why AppImage:
+# - Works on all Linux distributions (Ubuntu, Fedora, Arch, etc.)
+# - No root privileges required for installation
+# - One file, download and run
+# - Alternative: .deb/.rpm are distro-specific
 #
-# Vereisten:
-# - Ubuntu 20.04+ of vergelijkbaar
+
+# Requirements:
+# - Ubuntu 20.04+ or similar
 # - Python 3.10+
-# - appimagetool (wordt automatisch gedownload)
+# - appimagetool (downloaded automatically)
 #
-# Gebruik: ./build_linux.sh (vanuit de Libiry folder)
+# Usage: ./build_linux.sh (from the Library folder)
 # =============================================================================
 
-set -e  # Stop bij eerste error
+set -e  # Stops at first error
 
 echo ""
 echo "========================================"
@@ -29,20 +32,20 @@ echo "  Libiry Linux Build Script"
 echo "========================================"
 echo ""
 
-# Controleer of we in de juiste folder zijn
+# Check if we are in the correct folder
 if [ ! -f "main.py" ]; then
-    echo "ERROR: main.py niet gevonden. Run dit script vanuit de Libiry folder."
+    echo "ERROR: main.py not found. Run this script from the Libiry folder."
     exit 1
 fi
 
-# Detecteer architectuur
+# Detect architecture
 ARCH=$(uname -m)
 echo "Architecture: $ARCH"
 
-# Maak dist folder
+# Make dist folder
 mkdir -p dist/installer
 
-# Installeer system dependencies (Debian/Ubuntu)
+# Install system dependencies (Debian/Ubuntu)
 echo ""
 echo "[1/6] Checking system dependencies..."
 
@@ -88,7 +91,7 @@ elif command -v pacman &> /dev/null; then
         wget
 fi
 
-# Activeer of maak venv
+# Activate or make venv
 if [ -d "venv" ]; then
     echo "Activating virtual environment..."
     source venv/bin/activate
@@ -98,18 +101,18 @@ else
     source venv/bin/activate
 fi
 
-# Installeer Python build tools
+# Install Python build tools
 echo ""
 echo "[2/6] Installing build dependencies..."
 pip install --upgrade pip
 pip install --upgrade pyinstaller
 
-# Installeer app dependencies
+# Install app dependencies
 echo ""
 echo "[3/6] Installing app dependencies..."
 pip install -r requirements.txt
 
-# Download appimagetool als die niet bestaat
+# Download appimagetool if it doesn't exist
 echo ""
 echo "[4/6] Setting up AppImage tools..."
 
@@ -120,13 +123,13 @@ if [ ! -f "$APPIMAGETOOL" ]; then
     chmod +x "$APPIMAGETOOL"
 fi
 
-# Bouw met PyInstaller
+# Build with PyInstaller
 echo ""
 echo "[5/6] Building executable with PyInstaller..."
 echo "This may take several minutes..."
 
-# Linux gebruikt dezelfde spec als macOS (zonder Windows-specifieke deps)
-pyinstaller --clean --noconfirm libiry_macos.spec
+# Linux uses the same spec as macOS
+pyinstaller --clean --noconfirm linux/libiry.spec 
 
 if [ ! -d "dist/Libiry" ]; then
     echo ""
@@ -137,7 +140,7 @@ fi
 echo ""
 echo "PyInstaller build successful!"
 
-# Maak AppImage
+# Make AppImage
 echo ""
 echo "[6/6] Creating AppImage..."
 
@@ -147,10 +150,10 @@ mkdir -p "$APPDIR/usr/bin"
 mkdir -p "$APPDIR/usr/share/icons/hicolor/256x256/apps"
 mkdir -p "$APPDIR/usr/share/applications"
 
-# Kopieer PyInstaller output
+# Kopy PyInstaller output
 cp -R dist/Libiry/* "$APPDIR/usr/bin/"
 
-# Maak desktop entry
+# Make desktop entry
 cat > "$APPDIR/libiry.desktop" << 'DESKTOP'
 [Desktop Entry]
 Type=Application
@@ -162,11 +165,11 @@ Categories=Office;Viewer;
 Terminal=false
 DESKTOP
 
-# Kopieer ook naar usr/share/applications
+# Kopy to usr/share/applications too
 cp "$APPDIR/libiry.desktop" "$APPDIR/usr/share/applications/"
 
-# Converteer en kopieer icon
-# Probeer eerst met PIL, dan met ImageMagick
+# Convert and copy icon
+# Try with PIL first, then with ImageMagick
 if [ -f "resources/icons/Libiry.ico" ]; then
     python3 << 'PYTHON_SCRIPT' || true
 from PIL import Image
@@ -178,7 +181,7 @@ img.save("dist/Libiry.AppDir/usr/share/icons/hicolor/256x256/apps/libiry.png")
 PYTHON_SCRIPT
 fi
 
-# Fallback: als icon conversie niet lukte, maak een placeholder
+# Fallback: if icon conversion failed, make a placeholder
 if [ ! -f "$APPDIR/libiry.png" ]; then
     echo "Warning: Could not convert icon, using placeholder"
     # Maak een simpele placeholder icon met ImageMagick als beschikbaar
@@ -189,7 +192,7 @@ if [ ! -f "$APPDIR/libiry.png" ]; then
     fi
 fi
 
-# Maak AppRun script (entry point voor AppImage)
+# Make AppRun script (entry point for AppImage)
 cat > "$APPDIR/AppRun" << 'APPRUN'
 #!/bin/bash
 # AppImage entry point
@@ -201,11 +204,11 @@ exec "${HERE}/usr/bin/Libiry" "$@"
 APPRUN
 chmod +x "$APPDIR/AppRun"
 
-# Bouw de AppImage
+# Build the AppImage
 APPIMAGE_NAME="Libiry-${ARCH}.AppImage"
 FUSE_AVAILABLE=1
 
-# Check of FUSE beschikbaar is (nodig voor appimagetool)
+# Check if FUSE is available (neccesary for appimagetool)
 if ! fusermount -V &> /dev/null; then
     echo "Note: FUSE not available, using --appimage-extract-and-run"
     FUSE_AVAILABLE=0

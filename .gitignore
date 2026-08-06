@@ -38,7 +38,6 @@ _test*.epub
 # Build output
 build/
 dist/
-*.spec
 
 # Old/backup icons
 resources/icons/oud/
