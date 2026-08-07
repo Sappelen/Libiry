@@ -9,6 +9,24 @@ INSTALL INSTRUCTIONS<br>
 Windows:<br>
 Download LibirySetup.exe from the Releases page (https://github.com/Sappelen/Libiry/releases).<br>
 Run it. It installs Libiry and creates a desktop shortcut and Start Menu entry automatically.<br>
+If Windows' Smartapp blocks installation, click on More info → Run anyway                                                                                                                                                    
+● Expected — this is Windows SmartScreen blocking an unsigned installer. It has nothing to do with your code; it happens to every new installer that hasn't built up a download reputation
+  yet.
+
+  For you and testers right now:
+  Click More info → Run anyway. That's it.
+
+  For end users long-term, three options:
+
+  1. Wait for reputation — SmartScreen tracks download counts. After enough users download and run it without reporting problems, the warning disappears automatically. No action needed,
+  just takes time.
+  2. Code signing certificate — A paid certificate (~€100–400/year from DigiCert, Sectigo, etc.) signs the installer so SmartScreen trusts it immediately. Standard for commercial software.
+  3. Document it — Add a note to your installation instructions: "Windows may show a SmartScreen warning. Click 'More info' → 'Run anyway'. This is normal for new software without a
+  commercial certificate."
+
+
+
+
 <br>
 For developers:<br>
 git clone https://github.com/sappelen/Libiry.git "C:\Program Files\Libiry"<br>
