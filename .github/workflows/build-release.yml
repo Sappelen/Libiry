@@ -178,6 +178,7 @@ jobs:
             libmtdev-dev \
             fuse \
             libfuse2
+            xvfb
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -194,10 +195,9 @@ jobs:
 
       - name: Build with PyInstaller
         env:
-          SDL_VIDEODRIVER: dummy
           KIVY_NO_ENV_CONFIG: '1'
         run: |
-          pyinstaller --clean --noconfirm linux/libiry.spec
+          xvfb-run --auto-servernum pyinstaller --clean --noconfirm linux/libiry.spec
 
       - name: Download appimagetool
         run: |
