@@ -44,9 +44,14 @@ echo Creating launcher...
     echo python main.py
 ) > Libiry.bat
 
-REM Create desktop shortcut via PowerShell
+REM Create desktop shortcut via PowerShell, with fallback
 echo Creating desktop shortcut...
-powershell -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\Libiry.lnk');$s.TargetPath='%~dp0Libiry.bat';$s.WorkingDirectory='%~dp0';$s.IconLocation='%~dp0resources\icons\Libiry.ico';$s.Save()"
+powershell -ExecutionPolicy Bypass -NonInteractive -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\Libiry.lnk');$s.TargetPath='%~dp0Libiry.bat';$s.WorkingDirectory='%~dp0';$s.IconLocation='%~dp0resources\icons\Libiry.ico';$s.Save()"
+if errorlevel 1 (
+    echo PowerShell blocked - copying launcher to desktop instead...
+    copy "%~dp0Libiry.bat" "%USERPROFILE%\Desktop\Libiry.bat" >nul
+    echo Launcher copied to desktop.
+)
 
 echo.
 echo ========================================
