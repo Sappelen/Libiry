@@ -7,7 +7,8 @@ Note: Like the app itself, its documentation is also still under construction.<b
 INSTALL INSTRUCTIONS<br>
 <br>
 Windows:<br>
-Download LibirySetup.exe from the Releases page (https://github.com/Sappelen/Libiry/releases) and run it. It installs Libiry and creates a desktop shortcut and Start Menu entry automatically.<br>
+Download LibirySetup.exe from the Releases page (https://github.com/Sappelen/Libiry/releases).<br>
+Run it. It installs Libiry and creates a desktop shortcut and Start Menu entry automatically.<br>
 <br>
 For developers:<br>
 git clone https://github.com/sappelen/Libiry.git "C:\Program Files\Libiry"<br>
@@ -19,11 +20,18 @@ To create a desktop shortcut, right-click Libiry.bat → Send to → Desktop (cr
 Alternatively, use %LOCALAPPDATA%\Programs instead of C:\Program Files  (no admin rights needed).<br>
 <br>
 Linux:<br>
+<br>
+Method 1:<br>
+Download Libiry-0.5.0-Linux-x86_64.AppImage from the Releases page (https://github.com/Sappelen/Libiry/releases).<br><br>
+type chmod +x Libiry-0.5.0-Linux-x86_64.AppImage in your terminal<br>
+Run it (double-click it or type ./Libiry-0.5.0-Linux-x86_64.AppImage in your terminal)
+<br>
+Method 2:<br>
 curl -O https://raw.githubusercontent.com/sappelen/Libiry/master/linux/install.sh<br>
 chmod +x install.sh<br>
 ./install.sh<br>
 <br>
-For developers:<br>
+Method 3 (for developers):<br>
 git clone https://github.com/sappelen/Libiry.git<br>
 cd Libiry<br>
 chmod +x linux/install.sh<br>
@@ -41,6 +49,10 @@ The uninstaller removes the app from Program Files. It does not remove user data
 - %LOCALAPPDATA%\Libiry (cover cache)<br>
 <br>
 Linux:<br>
+Method 1:<br>
+Remove Libiry-0.5.0-Linux-x86_64.AppImage<br>
+<br>
+Methods 2 and 3:<br>
 cd /opt/Libiry<br>
 chmod +x linux/uninstall.sh<br>
 ./linux/uninstall.sh<br>
