@@ -70,7 +70,6 @@ UninstallDisplayName={#MyAppName}
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
-Name: "dutch"; MessagesFile: "compiler:Languages\Dutch.isl"
 
 [Files]
 ; Copy all files from the PyInstaller dist/Libiry folder
@@ -79,12 +78,12 @@ Source: "dist\Libiry\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs c
 
 ; The customize folder must be placed OUTSIDE the app folder
 ; First installation: copy defaults to user's AppData
-Source: "resources\*"; DestDir: "{userappdata}\Libiry\customize"; Flags: ignoreversion recursesubdirs createallsubdirs onlyifdoesntexist
+Source: "resources\*"; DestDir: "{userappdata}\Libiry\customize"; Flags: ignoreversion recursesubdirs createallsubdirs onlyifdoesntexist uninsneveruninstall
 
 [Dirs]
 ; Make sure the customize folder has the correct authorisation
-Name: "{userappdata}\Libiry"; Permissions: users-modify
-Name: "{userappdata}\Libiry\customize"; Permissions: users-modify
+Name: "{userappdata}\Libiry"; Permissions: users-modify; Flags: uninsneverdeletedir
+Name: "{userappdata}\Libiry\customize"; Permissions: users-modify; Flags: uninsneverdeletedir
 
 [Icons]
 ; Start Menu
@@ -127,3 +126,13 @@ begin
     end;
   end;
 end;
+
+procedure DeinitializeUninstall();
+  begin
+    if MsgBox('Do you also want to remove your Libiry settings and customizations?' +
+              #13#10 + ExpandConstant('{userappdata}\Libiry'),
+              mbConfirmation, MB_YESNO) = IDYES then
+    begin
+      DelTree(ExpandConstant('{userappdata}\Libiry'), True, True, True);
+    end;
+  end;
