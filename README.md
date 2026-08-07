@@ -7,7 +7,7 @@ Note: Like the app itself, its documentation is also still under construction.<b
 INSTALL INSTRUCTIONS<br>
 <br>
 Windows:<br>
-Download LibirySetup.exe from the Releases page and run it. It installs Libiry and creates a desktop shortcut and Start Menu entry automatically.<br>
+Download LibirySetup.exe from the Releases page (https://github.com/Sappelen/Libiry/releases) and run it. It installs Libiry and creates a desktop shortcut and Start Menu entry automatically.<br>
 <br>
 For developers:<br>
 git clone https://github.com/sappelen/Libiry.git "C:\Program Files\Libiry"<br>
