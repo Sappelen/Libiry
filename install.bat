@@ -46,8 +46,7 @@ echo Creating launcher...
 
 REM Create desktop shortcut via PowerShell
 echo Creating desktop shortcut...
-powershell -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\Libiry.lnk');$s.TargetPath='%~dp0Libiry.bat';$s.WorkingDirectory='%~dp0';$
-s.IconLocation='%~dp0resources\icons\Libiry.ico';$s.Save()"
+powershell -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\Libiry.lnk');$s.TargetPath='%~dp0Libiry.bat';$s.WorkingDirectory='%~dp0';$s.IconLocation='%~dp0resources\icons\Libiry.ico';$s.Save()"
 
 echo.
 echo ========================================
