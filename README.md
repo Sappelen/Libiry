@@ -51,6 +51,73 @@ The uninstaller removes the app from Program Files. It does not remove user data
 Linux:<br>
 Method 1:<br>
 Remove Libiry-0.5.0-Linux-x86_64.AppImage<br>
+  - ~/.config/Libiry/ (settings)
+  - ~/.cache/Libiry/ (cover cache)
+  - ~/.kivy/ (Kivy config)
+
+  This is standard AppImage behavior — by design. The upside is that reinstalling the AppImage picks up your old settings automatically.
+
+  If a user wants a truly clean uninstall they'd need to delete those folders manually. Your Linux uninstall instructions for AppImage users should say:
+
+  ▎ To uninstall: delete the .AppImage file.
+  ▎ To also remove your settings: rm -rf ~/.config/Libiry ~/.cache/Libiry
+  
+can you make a list of everything that might have come onto their computer (python, kivy) and how to remove that again, with terminal instructions? also pointing out the dangers?         
+● AppImage install leaves nothing system-level behind — Python and Kivy are bundled inside the AppImage file. The footprint is:
+
+  ┌─────────────┬────────────────────────────────┬──────────────────────────────────┬──────────────────────────────────────────────────────────────────────┐
+  │    What     │            Location            │          How to remove           │                                Danger                                │
+  ├─────────────┼────────────────────────────────┼──────────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+  │ The app     │ wherever you put the .AppImage │ rm ~/Downloads/Libiry-*.AppImage │ None                                                                 │
+  ├─────────────┼────────────────────────────────┼──────────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+  │ Settings    │ ~/.config/Libiry/              │ rm -rf ~/.config/Libiry/         │ Irreversible — your folder location and customizations are gone      │
+  ├─────────────┼────────────────────────────────┼──────────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+  │ Cover cache │ ~/.cache/Libiry/               │ rm -rf ~/.cache/Libiry/          │ Safe — rebuilds itself                                               │
+  ├─────────────┼────────────────────────────────┼──────────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+  │ Kivy config │ ~/.kivy/                       │ rm -rf ~/.kivy/                  │ Caution — if you have other Kivy apps, this removes their config too │
+  └─────────────┴────────────────────────────────┴──────────────────────────────────┴──────────────────────────────────────────────────────────────────────┘
+
+  Complete AppImage clean uninstall:
+  rm ~/Downloads/Libiry-*.AppImage
+  rm -rf ~/.config/Libiry/
+  rm -rf ~/.cache/Libiry/
+  Leave ~/.kivy/ unless you're certain you have no other Kivy apps.
+
+  ---
+  install.sh install touches system directories and requires sudo to clean up:
+
+  ┌───────────────────┬──────────────────────────────────────────────────────┬─────────────────────────────────────────────────────────┬────────────────────────────────────┐
+  │       What        │                       Location                       │                      How to remove                      │               Danger               │
+  ├───────────────────┼──────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────┼────────────────────────────────────┤
+  │ App + Python venv │ /opt/Libiry/                                         │ sudo rm -rf /opt/Libiry/                                │ None beyond losing the app         │
+  ├───────────────────┼──────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────┼────────────────────────────────────┤
+  │ CLI launcher      │ /usr/local/bin/libiry                                │ sudo rm /usr/local/bin/libiry                           │ None                               │
+  ├───────────────────┼──────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────┼────────────────────────────────────┤
+  │ System icon       │ /usr/share/pixmaps/libiry.png                        │ sudo rm /usr/share/pixmaps/libiry.png                   │ None                               │
+  ├───────────────────┼──────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────┼────────────────────────────────────┤
+  │ Desktop entry     │ ~/.local/share/applications/Libiry.desktop           │ rm ~/.local/share/applications/Libiry.desktop           │ None                               │
+  ├───────────────────┼──────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────┼────────────────────────────────────┤
+  │ User icon         │ ~/.local/share/icons/hicolor/256x256/apps/libiry.png │ rm ~/.local/share/icons/hicolor/256x256/apps/libiry.png │ None                               │
+  ├───────────────────┼──────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────┼────────────────────────────────────┤
+  │ Settings          │ ~/.config/Libiry/                                    │ rm -rf ~/.config/Libiry/                                │ Irreversible                       │
+  ├───────────────────┼──────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────┼────────────────────────────────────┤
+  │ Cover cache       │ ~/.cache/Libiry/                                     │ rm -rf ~/.cache/Libiry/                                 │ Safe                               │
+  ├───────────────────┼──────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────┼────────────────────────────────────┤
+  │ Kivy config       │ ~/.kivy/                                             │ rm -rf ~/.kivy/                                         │ Caution — other Kivy apps affected │
+  ├───────────────────┼──────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────┼────────────────────────────────────┤
+  │ System packages   │ libsdl2-dev, python3-venv, etc.                      │ see below                                               │ High danger                        │
+  └───────────────────┴──────────────────────────────────────────────────────┴─────────────────────────────────────────────────────────┴────────────────────────────────────┘
+
+  The uninstall.sh script handles everything except system packages and ~/.kivy/.
+
+  System packages — do not remove blindly. The packages installed by install.sh (python3-dev, python3-venv, libsdl2-dev, etc.) may be needed by other software. Running:
+  sudo apt-get remove python3-dev python3-venv libsdl2-dev
+  sudo apt-get autoremove
+  could remove dependencies shared with other apps. Only do this if you know these packages were not on your system before installing Libiry.
+
+
+
+
 <br>
 Methods 2 and 3:<br>
 cd /opt/Libiry<br>
