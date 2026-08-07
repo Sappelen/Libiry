@@ -177,7 +177,7 @@ jobs:
             libsdl2-ttf-dev \
             libmtdev-dev \
             fuse \
-            libfuse2
+            libfuse2 \
             xvfb
 
       - name: Set up Python
