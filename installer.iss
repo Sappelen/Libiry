@@ -128,11 +128,11 @@ begin
 end;
 
 procedure DeinitializeUninstall();
+begin
+  if MsgBox('Do you also want to remove your Libiry settings and customizations in ' +
+            ExpandConstant('{userappdata}\Libiry') + '?',
+            mbConfirmation, MB_YESNO) = IDYES then
   begin
-    if MsgBox('Do you also want to remove your Libiry settings and customizations?' +
-              #13#10 + ExpandConstant('{userappdata}\Libiry'),
-              mbConfirmation, MB_YESNO) = IDYES then
-    begin
-      DelTree(ExpandConstant('{userappdata}\Libiry'), True, True, True);
-    end;
+    DelTree(ExpandConstant('{userappdata}\Libiry'), True, True, True);
   end;
+end;
