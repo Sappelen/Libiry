@@ -7,9 +7,57 @@ Note: Like the app itself, its documentation is also still under construction.<b
 INSTALL INSTRUCTIONS<br>
 <br>
 Windows:<br>
+
+● Prerequisites
+  - Python 3.11 or 3.12 — download from python.org/downloads. During installation, check "Add Python to PATH".
+
+  Installation
+  1. Go to the Libiry GitHub releases page and download Source code (zip)
+  2. Extract the ZIP to a folder of your choice, for example C:\Users\YourName\Libiry
+  3. Open the extracted folder
+  4. Double-click install.bat
+  5. Wait for the installation to complete — a desktop shortcut is created automatically
+
+  To run Libiry
+  Use the desktop shortcut, or double-click Libiry.bat in the installation folder.
+
+  To uninstall
+  Delete the installation folder and the desktop shortcut. To also remove your settings, delete %APPDATA%\Libiry.
+
+  ---
+  That said — I'd still offer both paths on the releases page:
+
+  ▎ Windows — Option A (recommended): Download LibirySetup.exe and run it. If Windows blocks it, use Option B.
+  ▎
+  ▎ Windows — Option B (requires Python): Download Source code (zip), extract, run install.bat.
+
+  Most home users can click through SmartScreen with "More info → Run anyway". Only corporate machines with strict policies need Option B.
+
+
 Download LibirySetup.exe from the Releases page (https://github.com/Sappelen/Libiry/releases).<br>
 Run it. It installs Libiry and creates a desktop shortcut and Start Menu entry automatically.<br>
-If Windows' Smartapp blocks installation, click on More info → Run anyway                                                                                                                                                    
+If Windows' Smartapp blocks installation, click on More info → Run anyway        
+
+ That's a stricter block than the usual SmartScreen warning — no "More info" escape hatch. Two ways around it:
+
+  Option A — right-click unblock (easiest):
+  1. Right-click LibirySetup.exe → Properties
+  2. At the bottom of the General tab: check Unblock
+  3. Click Apply, OK, then run the installer
+
+The "Get apps from the Store" button is the clue — that's not SmartScreen, that's a separate Windows setting that restricts app installation to the Microsoft Store only.
+  Check: Settings → Apps → Advanced app settings → Choose where to get apps
+  If it's set to "The Microsoft Store only", change it to "Anywhere" (or "Anywhere, but let me know if there's a comparable app in the Store"). Then try the installer again.
+  This setting overrides SmartScreen entirely — no "More info" escape is possible when it's set to Store only, even as administrator.
+
+
+
+  Option B — PowerShell:
+  Unblock-File -Path "C:\path\to\LibirySetup.exe"
+  Then run the installer normally.
+
+  Both approaches remove the "downloaded from internet" mark that Windows attaches to the file. This is the permanent fix for that file — no need to change any security settings.
+
 ● Expected — this is Windows SmartScreen blocking an unsigned installer. It has nothing to do with your code; it happens to every new installer that hasn't built up a download reputation
   yet.
 
