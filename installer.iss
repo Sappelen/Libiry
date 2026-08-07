@@ -82,8 +82,9 @@ Source: "resources\*"; DestDir: "{userappdata}\Libiry\customize"; Flags: ignorev
 
 [Dirs]
 ; Make sure the customize folder has the correct authorisation
-Name: "{userappdata}\Libiry"; Permissions: users-modify; Flags: uninsneverdeletedir
-Name: "{userappdata}\Libiry\customize"; Permissions: users-modify; Flags: uninsneverdeletedir
+Name: "{userappdata}\Libiry"; Permissions: users-modify; Flags: uninsneveruninstall
+Name: "{userappdata}\Libiry\customize"; Permissions: users-modify; Flags: uninsneveruninstall
+
 
 [Icons]
 ; Start Menu
