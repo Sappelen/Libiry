@@ -63,7 +63,7 @@ def get_script_dir() -> Path:
     return Path(__file__).parent.parent
 
 def get_user_data_dir() -> Path:
-    """Platform-specific user data directory for Libiry settings:
+    r"""Platform-specific user data directory for Libiry settings:
     Windows: %APPDATA%\Libiry
     macOS:   ~/Library/Application Support/Libiry
     Linux:   $XDG_DATA_HOME/Libiry or ~/.local/share/Libiry"""
@@ -77,7 +77,7 @@ def get_user_data_dir() -> Path:
     return base / 'Libiry'
     
 def get_cache_dir() -> Path:
-    """Platform-specific cache directory for Libiry
+    r"""Platform-specific cache directory for Libiry
     Windows: %LOCALAPPDATA%\Libiry\cache
     macOS:   ~/Library/Caches/Libiry
     Linux:   $XDG_CACHE_HOME/Libiry or ~/.cache/Libiry"""
