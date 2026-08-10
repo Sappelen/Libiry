@@ -7,6 +7,23 @@ Note: Like the app itself, its documentation is also still under construction.<b
 INSTALL INSTRUCTIONS<br>
 <br>
 Windows:<br>
+  End-user install instructions (Windows)
+
+  ▎ Requirement: Python 3.11 or 3.12. Download from python.org/downloads (https://www.python.org/downloads/). During installation, check "Add Python to PATH".
+
+  1. Download Libiry-0.5.x.zip from the Releases page (https://github.com/Sappelen/Libiry/releases).
+  2. Right-click the ZIP → Extract All. The location doesn't matter — Downloads is fine.
+  3. Open the extracted folder in File Explorer. Click the address bar at the top, type cmd, press Enter. A Command Prompt opens in that folder.
+  4. Type exactly:
+  powershell -ExecutionPolicy Bypass -File install.ps1
+  4. Press Enter. Installation takes about two minutes.
+  5. A Libiry shortcut appears on your desktop. You can delete the extracted folder.
+
+  To uninstall:
+  - Delete %LOCALAPPDATA%\Programs\Libiry (type this in the File Explorer address bar)
+  - Delete the Libiry desktop shortcut
+  - To also remove your settings and library index: delete %APPDATA%\Libiry
+
 
 ● Prerequisites
   - Python 3.11 or 3.12 — download from python.org/downloads. During installation, check "Add Python to PATH".
