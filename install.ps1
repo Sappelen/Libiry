@@ -28,7 +28,7 @@ Copy-Item $source $target -Recurse -Force
 Write-Host "Setting up Python environment (this takes a minute)..."
 $py = if (Get-Command py -ErrorAction SilentlyContinue) { "py" } else { "python" }
 & $py -m venv "$target\venv"
-& "$target\venv\Scripts\pip" install --upgrade pip --quiet
+& "$target\venv\Scripts\python" -m pip install --upgrade pip --quiet
 & "$target\venv\Scripts\pip" install -r "$target\requirements.txt" --quiet
 
 Write-Host "Creating desktop shortcut..."
