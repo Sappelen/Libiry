@@ -23,7 +23,16 @@ Windows:<br>
   - Delete %LOCALAPPDATA%\Programs\Libiry (type this in the File Explorer address bar)
   - Delete the Libiry desktop shortcut
   - To also remove your settings and library index: delete %APPDATA%\Libiry
-
+troubleshoot: if nothing happens, open a new powershell command:
+ The script is correct. The problem is a stale PATH.
+  What happened:
+  1. install.ps1 ran → detected Windows Store Python → showed the error → exit 1 (nothing else ran)
+  2. You ran winget install Python.Python.3.12 → Python installed
+  3. You ran install.ps1 again in the same window → Get-Command python still found the old WindowsApps path because the window's PATH wasn't refreshed → exit 1 again
+  Fix: close the current terminal window, open a new one, navigate back to the Libiry folder, then run again:
+  powershell -ExecutionPolicy Bypass -File install.ps1
+  The new window picks up the updated PATH from winget's Python installation and the script will proceed past the check.
+ 
 
 ● Prerequisites
   - Python 3.11 or 3.12 — download from python.org/downloads. During installation, check "Add Python to PATH".
