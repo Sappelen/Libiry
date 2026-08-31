@@ -8,7 +8,7 @@ Tile font color: black
 Search box font color: black
 Rounded corners: Y
 Fuzzy search: N
-Store metadata in sidecar: N
+Metadata in sidecar: N
 Scrollbar width: 20
 Scrollbar always visible: Y
 Show book title: Y

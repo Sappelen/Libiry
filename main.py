@@ -264,7 +264,7 @@ class CoverImage(HoverBehavior, ButtonBehavior, BoxLayout):
         if visible:
             self._title_overlay.opacity = 1
             if hasattr(self, '_title_overlay_color'):
-                self._title_overlay_color.a = 0.8 #opacity
+                self._title_overlay_color.a = 1 #opacity
         else:
             self._title_overlay.opacity = 0
             if hasattr(self, '_title_overlay_color'):
@@ -3459,7 +3459,7 @@ class LibiryApp(LibiryKivyApp):
 
         # Section: Series info
         add_field('series', field_names.get('series', 'series') + ':', current['series'])
-        add_field('series_index', field_names.get('series_index', 'series_index') + ':', current['series_index'])
+        add_field('series_index', field_names.get('series_index', 'series index') + ':', current['series_index'])
 
         # Sectien: Rating
         add_field('rating', field_names.get('rating', 'rating') + ' (0-5):', current['rating'])
@@ -3468,8 +3468,8 @@ class LibiryApp(LibiryKivyApp):
         add_field('tags', field_names.get('tags', 'tags') + ':', current['tags'], multiline=True, height_mult=1.2)
 
         # Section: Extra fields
-        add_field('author_sort', field_names.get('author_sort', 'author_sort') + ':', current['author_sort'])
-        add_field('publication_date', field_names.get('publication_date', 'publication_date') + ':', current['publication_date'])
+        add_field('author_sort', field_names.get('author_sort', 'author sort') + ':', current['author_sort'])
+        add_field('publication_date', field_names.get('publication_date', 'publication date') + ':', current['publication_date'])
         add_field('pages', field_names.get('pages', 'pages') + ':', current['pages'])
         add_field('translator', field_names.get('translator', 'translator') + ':', current['translator'])
         add_field('illustrator', field_names.get('illustrator', 'illustrator') + ':', current['illustrator'])
@@ -3541,15 +3541,15 @@ class LibiryApp(LibiryKivyApp):
                 'cover': new_values['cover'],
                 'booktitle': new_values['booktitle'],
                 'author': new_values['author'],
-                'author_sort': new_values['author_sort'],
+                'author sort': new_values['author sort'],
                 'isbn': new_values['isbn'],
                 'rating': new_values['rating'],
                 'publisher': new_values['publisher'],
-                'publication_date': new_values['publication_date'],
+                'publication date': new_values['publication date'],
                 'language': new_values['language'],
                 'pages': new_values['pages'],
                 'series': new_values['series'],
-                'series_index': new_values['series_index'],
+                'series index': new_values['series index'],
                 'translator': new_values['translator'],
                 'illustrator': new_values['illustrator'],
                 'tags': sorted(new_tags),
@@ -3874,7 +3874,7 @@ class LibiryApp(LibiryKivyApp):
         self._add_yn_field(form, 'Show tags', 'show_tags', self.custom['show_tags'])
         self._add_yn_field(form, 'Rounded corners', 'rounded_corners', self.custom['rounded_corners'])
         self._add_yn_field(form, 'Fuzzy search', 'fuzzy_search', self.custom['fuzzy_search'])
-        self._add_yn_field(form, 'Store metadata in sidecar', 'metadata_in_sidecar', self.custom['metadata_in_sidecar'])
+        self._add_yn_field(form, 'Store book data in sidecar', 'metadata_in_sidecar', self.custom['metadata_in_sidecar'])
         self._create_label(form, "", style='subtitle')
         # === FIELD NAME SETTINGS ===
         add_section_header('Custom field names')
@@ -3884,23 +3884,23 @@ class LibiryApp(LibiryKivyApp):
         add_field('Cover', 'field_cover', field_names.get('cover', 'cover'))
         add_field('Booktitle', 'field_booktitle', field_names.get('booktitle', 'booktitle'))
         add_field('Author', 'field_author', field_names.get('author', 'author'))
-        add_field('Author_sort', 'field_author_sort', field_names.get('author_sort', 'author_sort'))
+        add_field('Author sort', 'field_author_sort', field_names.get('author_sort', 'author sort'))
         add_field('ISBN', 'field_isbn', field_names.get('isbn', 'isbn'))
         add_field('Rating', 'field_rating', field_names.get('rating', 'rating'))
         add_field('Publisher', 'field_publisher', field_names.get('publisher', 'publisher'))
-        add_field('Publication date', 'field_publication_date', field_names.get('publication_date', 'publication_date'))
+        add_field('Publication date', 'field_publication_date', field_names.get('publication_date', 'publication date'))
         add_field('Pages', 'field_pages', field_names.get('pages', 'pages'))
         add_field('Language', 'field_language', field_names.get('language', 'language'))
         add_field('Tags', 'field_tags', field_names.get('tags', 'tags'))
         add_field('Series', 'field_series', field_names.get('series', 'series'))
-        add_field('Series index', 'field_series_index', field_names.get('series_index', 'series_index'))
+        add_field('Series index', 'field_series_index', field_names.get('series_index', 'series index'))
         add_field('Translator', 'field_translator', field_names.get('translator', 'translator'))
         add_field('Illustrator', 'field_illustrator', field_names.get('illustrator', 'illustrator'))
         add_field('Description', 'field_description', field_names.get('description', 'description'))
         add_field('Notes', 'field_notes', field_names.get('notes', 'notes'))
         # Retrieve field names from the nested field_names dict
-        add_field('Book creation date (system)', 'field_book_created', field_names.get('book_created', 'book_created'))
-        add_field('Book modification date (system)', 'field_book_modified', field_names.get('book_modified', 'book_modified'))
+        add_field('Book creation date (system)', 'field_book_created', field_names.get('book_created', 'book created'))
+        add_field('Book modification date (system)', 'field_book_modified', field_names.get('book_modified', 'book modified'))
 
         scroll.add_widget(form)
         content_layout.add_widget(scroll)
